@@ -1,0 +1,101 @@
+---
+title: Installation
+description: Choose and install the correct Hyprism package for your platform
+---
+
+# Installation
+
+Use a packaged release unless you are developing Hyprism
+
+## Download a release
+
+Open [Hyprism Releases on GitHub](https://github.com/hyprismteam/Hyprism/releases) and choose the package for your system
+
+| Platform | Target | Packages |
+| --- | --- | --- |
+| Windows | x64 | EXE installer, MSI, or portable ZIP |
+| Linux | x64 | DEB, RPM, AppImage, Flatpak bundle, or tar.xz |
+| Linux with Nix | x86_64-linux | Nix flake |
+| macOS | Apple Silicon | DMG |
+
+The packages include the Hyprism Launcher executable and the separate Local Node executable used by autonomous local profiles
+
+## Command-line installation
+
+The one-line installers support Linux x64, Windows x64, and macOS Apple Silicon. They verify the downloaded package against the SHA-256 digest provided by GitHub before installation.
+
+### Linux x64
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hyprismteam/Hyprism/main/Scripts/install-linux.sh | sh
+```
+
+The installer stores versioned files under `~/.local/share/hyprism`, creates `~/.local/bin/hyprism`, and adds a desktop entry. Add `~/.local/bin` to `PATH` if it is not already present
+
+### Windows x64
+
+```powershell
+irm https://raw.githubusercontent.com/hyprismteam/Hyprism/main/Scripts/install-win.ps1 | iex
+```
+
+The installer stores Hyprism Launcher under `%LOCALAPPDATA%\Hyprism`, creates Desktop and Start Menu shortcuts, and adds the install directory to the user `PATH`
+
+### macOS Apple Silicon
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hyprismteam/Hyprism/main/Scripts/install-macos.sh | sh
+```
+
+The installer verifies the DMG, mounts it, and places Hyprism Launcher in `~/Applications` without requiring `sudo`. Current releases use ad hoc signing, so macOS may require approval in Privacy & Security on first launch
+
+### Linux with Nix
+
+Nix users can run the flake directly with flakes enabled
+
+```bash
+nix run 'github:hyprismteam/Hyprism?dir=Packaging/linux/flake#hyprism'
+```
+
+The flake currently targets `x86_64-linux`. Use the DMG workflow below on macOS
+
+## Platform notes
+
+### Windows
+
+Use the EXE or MSI to install Hyprism for all users. Approve the administrator prompt, then complete installation. The installer creates **Hyprism Launcher** shortcuts on the desktop and in the Start menu. Open either shortcut or search for **Hyprism Launcher** in Windows search. Uninstalling Hyprism removes these shortcuts.
+
+For a portable installation, extract the ZIP to a writable directory and start `Hyprism Launcher.exe`. The ZIP does not create shortcuts.
+
+### Linux
+
+Prefer DEB or RPM when your distribution supports it. Make an AppImage executable before running it. Replace `4.0.0` in these examples with the downloaded version
+
+```bash
+chmod +x Hyprism-linux-x64-4.0.0.AppImage
+./Hyprism-linux-x64-4.0.0.AppImage
+```
+
+The Flatpak bundle can be installed with the desktop software manager or Flatpak CLI
+
+```bash
+flatpak install ./Hyprism-linux-x64-4.0.0.flatpak
+```
+
+### macOS
+
+Use the macOS installer above or open the DMG and move Hyprism Launcher to Applications. The current release target requires Apple Silicon
+
+Autonomous mode may ask once for permission to trust Hyprism's local certificate authority. Canceling the prompt cancels that game launch without weakening TLS validation. See [Local Node](/reference/local-node#certificate-trust) for the reason
+
+## Run from source
+
+Contributors need the .NET 10 SDK and Git
+
+```bash
+git clone https://github.com/hyprismteam/Hyprism.git
+cd Hyprism
+dotnet restore Hyprism.slnx
+dotnet run --project Sources/Hyprism.Desktop/Hyprism.Desktop.csproj
+```
+
+Continue with [First run](/getting-started/first-run) after the launcher opens

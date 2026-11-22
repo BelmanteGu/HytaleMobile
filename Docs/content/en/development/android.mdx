@@ -1,0 +1,130 @@
+---
+title: Android
+description: Building, installing, and debugging the Android launcher and the native game host
+---
+
+# Android {/* #android */}
+
+This guide builds the Android launcher and the game host, installs the game files on a device, and explains the debugging tools. The design is described in the [Android architecture page](/architecture/android).
+
+## Prerequisites {/* #prerequisites */}
+
+| Tool | Notes |
+| --- | --- |
+| .NET 10 SDK with the `android` workload | `dotnet workload install android` |
+| JDK 21 | .NET Android and the host APK build use it |
+| Android SDK with build tools 35 and platform 35 | Provides `aapt2`, `d8`, `zipalign`, and `apksigner` |
+| Android NDK | The newest installed NDK is used |
+| CMake, Ninja, and Git | For the host libraries |
+| A macOS or Linux host | The scripts read `ANDROID_HOME` and `ANDROID_NDK_HOME`, or use the default SDK location of the host. On Windows, run them in WSL 2 |
+| An arm64 device | Tested on a Galaxy S23 (Snapdragon 8 Gen 2, Adreno 740, Android 16) |
+
+## Launcher APK {/* #launcher-apk */}
+
+```bash
+dotnet publish Sources/Hyprism.Android/Hyprism.Android.csproj -c Release \
+  -p:AndroidSdkDirectory=$HOME/Library/Android/sdk \
+  -p:JavaSdkDirectory=/path/to/jdk-21
+adb install -r Sources/Hyprism.Android/bin/Release/net10.0-android/publish/org.hyprism.launcher-Signed.apk
+```
+
+Release builds disable trimming and AOT because Core uses reflection for JSON and services. Marshal methods are disabled because Avalonia's Android application type is generic.
+
+## Game host APK {/* #game-host-apk */}
+
+Build the host libraries once, then the loader and the APK:
+
+```bash
+cd Sources/Hyprism.MachOLoader
+./deps.sh
+./build.sh
+JAVA_HOME=/path/to/jdk-21 android/build-apk.sh
+adb install -r out/hyprism-game.apk
+```
+
+`build.sh` produces `out/hyprism-macho`, a command line loader for `adb shell` tests, and `out/libmain.so` for the APK. `build-apk.sh` packages SDL's Java sources with a 64 MiB `SDLThread` stack, the host's `HytaleActivity` and `TlsBridge`, `libSDL3.so`, `libmain.so`, `libmobileglues.so`, and `libopenal.so` without Gradle.
+
+## Game files {/* #game-files */}
+
+Copy a macOS Hytale installation (release build 34 was tested) into the host's files directory and move `Data` next to the executable:
+
+```bash
+F=/sdcard/Android/data/org.hyprism.game/files
+adb shell mkdir -p $F/UserData
+adb push <instance>/Client $F/
+adb push <instance>/Assets.zip $F/Assets.zip
+adb shell "mv $F/Client/Hytale.app/Contents/Resources/Data $F/Client/Hytale.app/Contents/MacOS/Data"
+adb shell "chmod -R a+rwX $F/Client $F/UserData; chmod a+rw $F/Assets.zip"
+```
+
+Files pushed by `adb` belong to the shell user, so the permission change lets the host app read them. Do not redistribute the client files.
+
+## Running {/* #running */}
+
+Sign in with an official account in the launcher, select the instance, and press **Launch**. To start the host without the launcher, use `adb shell am start -n org.hyprism.game/.HytaleActivity`; the client then stops at its authentication check.
+
+The host reads optional files from its files directory:
+
+| File | Purpose |
+| --- | --- |
+| `env.txt` | `NAME=value` lines set before the client starts |
+| `args.txt` | Extra client arguments, one per line |
+| `MG/config.json` | MobileGlues settings, created with `customGLVersion` 41 |
+
+Useful environment entries:
+
+| Variable | Effect |
+| --- | --- |
+| `MACHO_SOFT_TRAPS=1` | Missing imports return 0 instead of exiting |
+| `MACHO_TRACE_ALL=1` | Logs every call through a bound import, which slows the client down considerably |
+| `MACHO_TRACE=1` | Extra shim diagnostics on stderr |
+| `HYPRISM_UI_SCALE` | Reports SDL window and mouse coordinates in points at this density; 1 (off) by default, because the game interface scales with the viewport height |
+| `HYPRISM_GL_TRACE=1` | Logs under `[gl]` the GL functions the client resolves, the first texture uploads and framebuffer changes, draws into small offscreen viewports, and GL errors |
+| `DOTNET_gcConcurrent=0` | Disables the background GC |
+
+NativeAOT reads `DOTNET_` values as hexadecimal without a `0x` prefix and silently ignores values it cannot parse.
+
+## Debugging {/* #debugging */}
+
+| Log | Command |
+| --- | --- |
+| Loader and shims | `adb logcat -s HytaleLoader` |
+| Client standard output | `adb logcat -s Hytale` |
+| Client log file | `adb shell run-as org.hyprism.game cat <files>/UserData/Logs/<date>_client.log` |
+| MobileGlues | `adb shell run-as org.hyprism.game cat <files>/MG/latest.log` |
+
+The loader logs the following diagnostics:
+
+- `UNIMPLEMENTED <symbol>` for an import without a shim.
+- `[signal] fault ...` with the image and offset of the faulting instruction and a frame pointer backtrace. When the .NET runtime decides a fault is not managed it restores the default action and the process exits without a tombstone, so this record is the only trace.
+- `[mem] ... failed` for failed memory calls and `[fs] ... missing` for files the client looks up and does not find.
+- `[dyld] dlopen(...)` and `dlsym(...) not found` for library loading.
+- `[tls] <host>: <error>` for a failed TLS session and `[tls] chain rejected` for a certificate chain the platform does not trust.
+- `[net] <call>(fd) failed` for socket calls that fail with something other than a would-block result.
+- `[gl] shader <id>: emulating an upper-left gl_FragCoord origin` for each rewritten fragment shader.
+
+To map a managed stack offset to code, disassemble the client with `llvm-objdump` at `0x100000000 + offset` and read the call before the return address.
+
+## Tests {/* #tests */}
+
+Host tests run on an arm64 Mac and compare the shims with Apple's own implementations:
+
+```bash
+cc -O1 -Wno-deprecated-declarations tests/crypto_vs_commoncrypto.c -Isrc -o /tmp/cctest && /tmp/cctest
+clang++ -std=c++17 -w -Isrc tests/cxx_string_vs_libcxx.cpp -o /tmp/cxxtest && /tmp/cxxtest
+```
+
+Device tests link the loader sources into small executables for `adb shell`:
+
+| Test | Checks |
+| --- | --- |
+| `tests/vm_thunks_test.c` | The NativeAOT thunk pool sequence through `vm_allocate`, `vm_remap`, and `mprotect` |
+| `tests/errno_mirror_test.c` | The Darwin errno slot across cleared and failed calls, and `EAGAIN` from a would-block read |
+
+## Patches {/* #patches */}
+
+`deps.sh` applies the files in [`Sources/Hyprism.MachOLoader/patches`](../../../../Sources/Hyprism.MachOLoader/patches) to the fetched dependencies:
+
+| Patch | Fix |
+| --- | --- |
+| `mobileglues-shader-source-count.patch` | `glShaderSource` passed the original source count after joining all sources into one string, which made the driver read past the array for multi-part shaders |

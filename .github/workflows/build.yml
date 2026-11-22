@@ -1,0 +1,36 @@
+# Copyright (C) 2026 Hyprism Launcher
+# SPDX-License-Identifier: GPL-3.0-only
+
+name: Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Platforms to build: linux, windows, macos, or all'
+        required: false
+        default: 'all'
+        type: string
+  workflow_call:
+    inputs:
+      platforms:
+        description: 'Platforms to build: linux, windows, macos, or all'
+        required: false
+        default: 'all'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    if: inputs.platforms == 'all' || contains(inputs.platforms, 'linux')
+    uses: ./.github/workflows/build-linux.yml
+
+  windows:
+    if: inputs.platforms == 'all' || contains(inputs.platforms, 'windows')
+    uses: ./.github/workflows/build-windows.yml
+
+  macos:
+    if: inputs.platforms == 'all' || contains(inputs.platforms, 'macos')
+    uses: ./.github/workflows/build-macos.yml

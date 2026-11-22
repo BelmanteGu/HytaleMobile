@@ -1,0 +1,20 @@
+diff --git a/db/c.cc b/db/c.cc
+index 7b3dee3..7045e18 100644
+--- a/db/c.cc
++++ b/db/c.cc
+@@ -8679,6 +8679,15 @@ void rocksdb_approximate_memory_usage_destroy(rocksdb_memory_usage_t* usage) {
+   delete usage;
+ }
+ 
++// Hytale extension: pause and resume background compactions and flushes.
++void rocksdb_pause_background_work(rocksdb_t* db, char** errptr) {
++  SaveError(errptr, db->rep->PauseBackgroundWork());
++}
++
++void rocksdb_continue_background_work(rocksdb_t* db, char** errptr) {
++  SaveError(errptr, db->rep->ContinueBackgroundWork());
++}
++
+ void rocksdb_cancel_all_background_work(rocksdb_t* db, unsigned char wait) {
+   CancelAllBackgroundWork(db->rep, wait);
+ }

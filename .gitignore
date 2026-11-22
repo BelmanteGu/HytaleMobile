@@ -1,0 +1,101 @@
+# Copyright (C) 2026 Hyprism Launcher
+# SPDX-License-Identifier: GPL-3.0-only
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.*hidden
+
+# .NET / C# Build outputs
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+*.user
+*.suo
+*.cache
+.vs/
+.artifacts/*
+Build/icons/*
+Build/*
+
+# Rider IDE
+.idea/
+*.swp
+*.swo
+.c*/
+
+# VS Code
+.vscode/
+
+# Frontend Build outputs
+packaging-build
+wwwroot/
+node_modules/
+.next/
+Docs/out/
+Docs/.next/
+Docs/.docusaurus/
+Docs/.pagefind/
+Docs/AGENTS.md
+Docs/CLAUDE.md
+*.tsbuildinfo
+
+# Environment files (contains secrets)
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+build/bin/
+build/darwin/
+build/windows/
+release-artifacts/
+
+# Configuration files with sensitive data
+*.local
+appsettings.Development.json
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+~*
+
+# Flatpak build artifacts
+flatpak-repo/
+.flatpak-builder/
+*.flatpak
+Properties/linux/flatpak/bundle
+repo
+build-dir
+flathub-bundle.tar.gz
+
+# Build artifacts folder
+artifacts/
+dist/
+dmg-arm64/Applications
+scripts/build-linux-all-ubuntu.sh
+
+# Python debug scripts
+__pycache__/
+*.pyc
+*.hash
+tu.sh
+
+# Virtual environments
+.venv/
+venv/
+Properties/linux/flathub/nuget-sources.json
+Properties/linux/flathub/generated-sources.json
+
+# Local world server builds (Sources/Hyprism.MachOLoader/server)
+Sources/Hyprism.MachOLoader/server/deps/
+Sources/Hyprism.MachOLoader/server/build/
+Sources/Hyprism.MachOLoader/server/out/

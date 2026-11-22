@@ -1,0 +1,74 @@
+<!--
+Copyright (C) 2026 Hyprism Launcher
+SPDX-License-Identifier: GPL-3.0-only
+-->
+
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Android head. It compiles the shared launcher UI from Hyprism.Desktop and keeps
+    the Hyprism.Desktop assembly name so avares:// URIs and resource names resolve.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>24</SupportedOSPlatformVersion>
+    <AssemblyName>Hyprism.Desktop</AssemblyName>
+    <RootNamespace>Hyprism.Desktop</RootNamespace>
+    <ApplicationId>org.hyprism.launcher</ApplicationId>
+    <ApplicationTitle>Hyprism</ApplicationTitle>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>4.0.0</ApplicationDisplayVersion>
+    <Version>4.0.0</Version>
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
+    <RuntimeIdentifiers>android-arm64</RuntimeIdentifiers>
+    <!-- Core reads JSON and services through reflection, which trimming would break -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <RunAOTCompilation>false</RunAOTCompilation>
+    <!-- Avalonia's Application is generic; register its JNI methods dynamically -->
+    <AndroidEnableMarshalMethods>false</AndroidEnableMarshalMethods>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <DesktopSources>../Hyprism.Desktop/</DesktopSources>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="$(DesktopSources)**/*.cs"
+             Exclude="$(DesktopSources)bin/**;$(DesktopSources)obj/**;$(DesktopSources)Program.cs;$(DesktopSources)Platform/DesktopRenderOptions.cs"
+             Link="Shared/%(RecursiveDir)%(Filename)%(Extension)" />
+    <AvaloniaXaml Include="$(DesktopSources)**/*.axaml"
+                  Exclude="$(DesktopSources)bin/**;$(DesktopSources)obj/**"
+                  Link="%(RecursiveDir)%(Filename)%(Extension)" />
+    <AvaloniaResource Include="$(DesktopSources)Assets/**"
+                      Exclude="$(DesktopSources)Assets/**/*.axaml"
+                      Link="Assets/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="$(DesktopSources)Localization/*.resx"
+                      Link="Localization/%(Filename)%(Extension)" />
+    <AndroidResource Include="Icon.png" Link="Resources/drawable/Icon.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The shared UI uses Avalonia types named Application and Button -->
+    <Using Remove="Android.App" />
+    <Using Remove="Android.Widget" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AngleSharp" Version="1.8.2" />
+    <PackageReference Include="Avalonia" Version="12.1.2" />
+    <PackageReference Include="Avalonia.Android" Version="12.1.2" />
+    <PackageReference Include="Avalonia.Labs.Lottie" Version="12.0.2" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="DiscordRichPresence" Version="1.143.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="Xamarin.AndroidX.Core.SplashScreen" Version="1.2.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Hyprism.Core/Hyprism.Core.csproj" />
+  </ItemGroup>
+
+</Project>

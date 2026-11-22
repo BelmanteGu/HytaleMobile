@@ -1,0 +1,12 @@
+<!--
+Copyright (C) 2026 Hyprism Launcher
+SPDX-License-Identifier: GPL-3.0-only
+-->
+
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Hyprism.Desktop.Screens.Settings"
+             x:Class="Hyprism.Desktop.Screens.Settings.SettingsVisualView"
+             x:DataType="vm:SettingsViewModel">
+  <vm:SettingsAppearancePickerView IsVisible="{Binding IsVisual}" />
+</UserControl>

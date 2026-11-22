@@ -1,0 +1,1718 @@
+<!--
+Copyright (C) 2026 Hyprism Launcher
+SPDX-License-Identifier: GPL-3.0-only
+-->
+
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:Hyprism.Desktop.Controls"
+        xmlns:easing="using:Avalonia.Animation.Easings"
+        xmlns:instances="using:Hyprism.Desktop.Screens.Instances">
+  <!-- Selectors owned by the Instances screen -->
+
+  <Style Selector="instances|InstancesView">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Grid.instancesPage">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instancesListPane">
+    <Setter Property="Background" Value="{DynamicResource NavigationPaneBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView.compact Border.instancesListPane">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceIconClip">
+    <Setter Property="ClipToBounds" Value="True" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceIconClip.list">
+    <Setter Property="CornerRadius" Value="8" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceIconClip.hero">
+    <Setter Property="CornerRadius" Value="20" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceIconClip.editor">
+    <Setter Property="CornerRadius" Value="10" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Grid.instancesListGameIcon,
+                   instances|InstancesView Image.instancesListGameIcon">
+    <Setter Property="Width" Value="0" />
+    <Setter Property="Height" Value="0" />
+    <Setter Property="IsVisible" Value="False" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceEditorIconCard">
+    <Setter Property="Background" Value="{DynamicResource ControlGroupBrush}" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="Padding" Value="16" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceEditorIconPreview">
+    <Setter Property="Width" Value="72" />
+    <Setter Property="Height" Value="72" />
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceBrush}" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instanceEditorIconChoose">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceEditorIconResetSlot">
+    <Setter Property="Width" Value="0" />
+    <Setter Property="Opacity" Value="0" />
+    <Setter Property="ClipToBounds" Value="True" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="Width" Duration="0:0:0.32">
+          <DoubleTransition.Easing><easing:CubicEaseInOut /></DoubleTransition.Easing>
+        </DoubleTransition>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.22" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceEditorIconResetSlot.open">
+    <Setter Property="Width" Value="108" />
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+
+  <Style Selector="instances|InstancesView.compact Grid.instancesListGameIcon,
+                   instances|InstancesView.compact Image.instancesListGameIcon">
+    <Setter Property="Width" Value="38" />
+    <Setter Property="Height" Value="38" />
+    <Setter Property="IsVisible" Value="True" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instancesVersionPicker">
+    <Setter Property="Height" Value="44" />
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceBrush}" />
+    <Setter Property="CornerRadius" Value="11" />
+  </Style>
+
+  <Style Selector="instances|InstanceCreatorView Button.packageImportAction,
+                   instances|InstanceCreatorView Button.instanceExportAction">
+    <Setter Property="Width" Value="150" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+  </Style>
+
+  <Style Selector="instances|InstanceCreatorView Button.packageImportAction.active,
+                   instances|InstanceCreatorView Button.packageImportAction.active:pointerover,
+                   instances|InstanceCreatorView Button.instanceExportAction.active,
+                   instances|InstanceCreatorView Button.instanceExportAction.active:pointerover">
+    <Setter Property="Width" Value="272" />
+    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstanceCreatorView Button.packageImportAction.active.cancelArmed:pointerover">
+    <Setter Property="Background" Value="{DynamicResource DangerActionBrush}" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+
+  <Style Selector="instances|InstanceCreatorView Button.packageImportAction.active Grid.managedActionContent,
+                   instances|InstanceCreatorView Button.instanceExportAction.active Grid.managedActionContent">
+    <Setter Property="Width" Value="232" />
+    <Setter Property="MinWidth" Value="232" />
+    <Setter Property="MaxWidth" Value="232" />
+  </Style>
+
+  <Style Selector="instances|InstanceOverviewView Button.managerAction.primary.instanceOperationStatus">
+    <Setter Property="Width" Value="0" />
+    <Setter Property="Height" Value="36" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Opacity" Value="0" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="ClipToBounds" Value="True" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="Width" Duration="0:0:0.32">
+          <DoubleTransition.Easing><easing:CubicEaseInOut /></DoubleTransition.Easing>
+        </DoubleTransition>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.22" />
+        <BrushTransition Property="Background" Duration="0:0:0.16" />
+        <BrushTransition Property="Foreground" Duration="0:0:0.16" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstanceOverviewView Button.managerAction.primary.instanceOperationStatus.active">
+    <Setter Property="Width" Value="180" />
+    <Setter Property="Padding" Value="10,0" />
+    <Setter Property="Opacity" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstanceOverviewView Button.managerAction.primary.instanceOperationStatus.active.cancelArmed:pointerover">
+    <Setter Property="Background" Value="{DynamicResource DangerActionBrush}" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+
+  <Style Selector="instances|InstanceOverviewView Button.managerAction.primary.instanceOperationStatus.active Grid.managedActionContent">
+    <Setter Property="Width" Value="148" />
+    <Setter Property="MinWidth" Value="148" />
+    <Setter Property="MaxWidth" Value="148" />
+  </Style>
+
+  <Style Selector="instances|InstanceCreatorView Border.instanceExportFormatRow">
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Padding" Value="0" />
+  </Style>
+
+  <Style Selector="instances|InstanceCreatorView RadioButton.instanceExportFormatOption">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="MinHeight" Value="58" />
+    <Setter Property="Padding" Value="18,10" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="RenderTransform" Value="{x:Null}" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.16" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstanceCreatorView RadioButton.instanceExportFormatOption:pointerover">
+    <Setter Property="Background" Value="{DynamicResource SubtleHoverBrush}" />
+    <Setter Property="RenderTransform" Value="{x:Null}" />
+  </Style>
+
+  <Style Selector="instances|InstanceCreatorView RadioButton.instanceExportFormatOption:pressed">
+    <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}" />
+    <Setter Property="RenderTransform" Value="{x:Null}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Path.instancesVersionSpinner">
+    <Setter Property="Fill" Value="Transparent" />
+    <Setter Property="Stroke" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="StrokeThickness" Value="2" />
+    <Setter Property="StrokeLineCap" Value="Round" />
+    <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+  </Style>
+
+  <Style Selector="instances|InstancesView.compact StackPanel.managerWideActions">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Grid.instanceGameIcon">
+    <Setter Property="Width" Value="144" />
+    <Setter Property="Height" Value="144" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="instances|InstancesView StackPanel.instanceHeroIdentity">
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.managerCompactActionPart.main.active.cancelArmed:pointerover">
+    <Setter Property="Background" Value="{DynamicResource DangerActionBrush}" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.managerAction.primary.active:not(.instanceOperationStatus)">
+    <Setter Property="Width" Value="265" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.managerAction.primary.active.editCollapsed">
+    <Setter Property="Width" Value="438" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.managerAction.primary.active.cancelArmed:pointerover">
+    <Setter Property="Background" Value="{DynamicResource DangerActionBrush}" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.managerCompactActionPart.main.active Grid.managedActionContent">
+    <Setter Property="Width" Value="190" />
+    <Setter Property="MinWidth" Value="190" />
+    <Setter Property="MaxWidth" Value="190" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Path.managedActionIcon">
+    <Setter Property="Width" Value="18" />
+    <Setter Property="Height" Value="18" />
+    <Setter Property="Stretch" Value="Uniform" />
+    <Setter Property="Fill" Value="{Binding $parent[Button].Foreground}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+
+  <Style Selector="instances|InstancesView TextBlock.managedActionMetric">
+    <Setter Property="FontFeatures" Value="tnum" />
+  </Style>
+
+  <Style Selector="instances|InstanceOverviewView.switchingInstance Button.managerAction,
+                  instances|InstanceOverviewView.switchingInstance Button.managerCompactActionPart,
+                  instances|InstanceOverviewView.switchingInstance StackPanel.managedActionIdle,
+                  instances|InstanceOverviewView.switchingInstance Grid.managedActionProgress,
+                  instances|InstanceOverviewView.switchingInstance TextBlock.managedActionCancel,
+                  instances|InstanceOverviewView.switchingInstance Border.managerWideActionDivider">
+    <Setter Property="Transitions" Value="{x:Null}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceMenuGroup">
+    <Setter Property="Background" Value="{DynamicResource ControlGroupBrush}" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+
+  <Style Selector="instances|InstancesView TextBlock.instanceMenuTitle">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView TextBlock.instanceMenuDescription">
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    <Setter Property="MaxLines" Value="2" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Path.instanceMenuChevron">
+    <Setter Property="Width" Value="15" />
+    <Setter Property="Height" Value="15" />
+    <Setter Property="Stretch" Value="Uniform" />
+    <Setter Property="Fill" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Image.instanceMenuIcon,
+                   instances|InstanceCreatorView Image.exportKindIcon,
+                   instances|InstanceCreatorView Image.creationChoiceIcon">
+    <Setter Property="Width" Value="28" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="Stretch" Value="Uniform" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="IsHitTestVisible" Value="False" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Path.instancePlaceholderIcon">
+    <Setter Property="Width" Value="46" />
+    <Setter Property="Height" Value="46" />
+    <Setter Property="Stretch" Value="Uniform" />
+    <Setter Property="Fill" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceContentPanel">
+    <Setter Property="Background" Value="{DynamicResource ControlGroupBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource StrokeBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="18" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceContentPanel.catalog">
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+
+  <Style Selector="instances|InstancesView TextBox.instanceSearch">
+    <Setter Property="Height" Value="40" />
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource StrokeBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="11" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.16" />
+        <BrushTransition Property="BorderBrush" Duration="0:0:0.16" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView TextBox.instanceSearch:pointerover">
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceHoverBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView TextBox.instanceSearch:focus">
+    <Setter Property="BorderBrush" Value="{DynamicResource StrokeStrongBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView TextBox.logsSearch">
+    <Setter Property="Padding" Value="44,9,12,9" />
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="11" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="FocusAdorner" Value="{x:Null}" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Foreground" Duration="0:0:0.18" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView TextBox.logsSearch /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.18" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView TextBox.logsSearch:pointerover /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceHoverBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+
+  <Style Selector="instances|InstancesView TextBox.logsSearch:focus /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceActiveBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Path.logsSearchIcon">
+    <Setter Property="Width" Value="18" />
+    <Setter Property="Height" Value="18" />
+    <Setter Property="Margin" Value="12,0,0,0" />
+    <Setter Property="Stretch" Value="Uniform" />
+    <Setter Property="Fill" Value="{DynamicResource TextMutedBrush}" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="IsHitTestVisible" Value="False" />
+  </Style>
+
+  <Style Selector="instances|InstancesView controls|ModalTextField TextBox.catalogSearch">
+    <Setter Property="Height" Value="40" />
+    <Setter Property="Padding" Value="12,0,48,0" />
+  </Style>
+
+  <Style Selector="instances|InstancesView controls|ModalTextField TextBox.installedModsSearch">
+    <Setter Property="Height" Value="40" />
+    <Setter Property="Padding" Value="12,0" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ListBox#InstalledModsList">
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.18">
+          <DoubleTransition.Easing><easing:CubicEaseInOut /></DoubleTransition.Easing>
+        </DoubleTransition>
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView ListBox#InstalledModsList.loading">
+    <Setter Property="Opacity" Value="0" />
+    <Setter Property="IsHitTestVisible" Value="False" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instanceBulkUpdateAction">
+    <Setter Property="Height" Value="40" />
+    <Setter Property="Padding" Value="14,0" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.16" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.modCatalogSearchAction">
+    <Setter Property="Width" Value="34" />
+    <Setter Property="Height" Value="34" />
+    <Setter Property="Margin" Value="0,0,4,0" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Opacity" Value="0" />
+    <Setter Property="IsHitTestVisible" Value="False" />
+    <Setter Property="RenderTransform" Value="scale(0.82)" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.18">
+          <DoubleTransition.Easing><easing:CubicEaseOut /></DoubleTransition.Easing>
+        </DoubleTransition>
+        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18">
+          <TransformOperationsTransition.Easing><easing:CubicEaseOut /></TransformOperationsTransition.Easing>
+        </TransformOperationsTransition>
+        <BrushTransition Property="Background" Duration="0:0:0.16" />
+        <BrushTransition Property="Foreground" Duration="0:0:0.16" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.modCatalogSearchAction.visible">
+    <Setter Property="Opacity" Value="1" />
+    <Setter Property="IsHitTestVisible" Value="True" />
+    <Setter Property="RenderTransform" Value="scale(1)" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.modCatalogSearchAction.hidden">
+    <Setter Property="Opacity" Value="0" />
+    <Setter Property="IsHitTestVisible" Value="False" />
+    <Setter Property="RenderTransform" Value="scale(0.82)" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.modCatalogSearchAction:pointerover">
+    <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="RenderTransform" Value="scale(1.06)" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.modCatalogSearchAction:pressed">
+    <Setter Property="Background" Value="{DynamicResource ItemSelectedBrush}" />
+    <Setter Property="RenderTransform" Value="scale(0.96)" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Path.modCatalogSearchSpinner">
+    <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Path.modCatalogSearchSpinner.loading">
+    <Style.Animations>
+      <Animation Duration="0:0:0.8" IterationCount="Infinite">
+        <KeyFrame Cue="0%">
+          <Setter Property="RotateTransform.Angle" Value="0" />
+        </KeyFrame>
+        <KeyFrame Cue="100%">
+          <Setter Property="RotateTransform.Angle" Value="360" />
+        </KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instanceToolbarAction">
+    <Setter Property="Height" Value="40" />
+    <Setter Property="Padding" Value="14,0" />
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource StrokeBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.16" />
+        <BrushTransition Property="BorderBrush" Duration="0:0:0.16" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instanceToolbarAction:pointerover">
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceHoverBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource StrokeStrongBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instanceToolbarAction.primarySmall">
+    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.catalogInstallTopBar">
+    <Setter Property="Opacity" Value="0" />
+    <Setter Property="RenderTransformOrigin" Value="100%,50%" />
+    <Setter Property="RenderTransform" Value="scale(0.94) translateX(10px)" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.18">
+          <DoubleTransition.Easing><easing:CubicEaseOut /></DoubleTransition.Easing>
+        </DoubleTransition>
+        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18">
+          <TransformOperationsTransition.Easing><easing:CubicEaseOut /></TransformOperationsTransition.Easing>
+        </TransformOperationsTransition>
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.catalogInstallTopBar.visible">
+    <Setter Property="Opacity" Value="1" />
+    <Setter Property="RenderTransform" Value="scale(1) translateX(0px)" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.catalogInstallTopBar.hidden">
+    <Setter Property="Opacity" Value="0" />
+    <Setter Property="RenderTransform" Value="scale(0.94) translateX(10px)" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.logsShowFolderAction">
+    <Setter Property="Opacity" Value="0" />
+    <Setter Property="RenderTransformOrigin" Value="100%,50%" />
+    <Setter Property="RenderTransform" Value="scale(0.94) translateX(10px)" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.18">
+          <DoubleTransition.Easing><easing:CubicEaseOut /></DoubleTransition.Easing>
+        </DoubleTransition>
+        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18">
+          <TransformOperationsTransition.Easing><easing:CubicEaseOut /></TransformOperationsTransition.Easing>
+        </TransformOperationsTransition>
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.logsShowFolderAction.visible">
+    <Setter Property="Opacity" Value="1" />
+    <Setter Property="RenderTransform" Value="scale(1) translateX(0px)" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.logsShowFolderAction.hidden">
+    <Setter Property="Opacity" Value="0" />
+    <Setter Property="RenderTransform" Value="scale(0.94) translateX(10px)" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.catalogInstallTopBarAction">
+    <Setter Property="Width" Value="126" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceModRow">
+    <Setter Property="Padding" Value="12" />
+    <Setter Property="Margin" Value="0,0,0,4" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="13" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.16" />
+        <DoubleTransition Property="Opacity" Duration="0:0:0.16" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceModRow:pointerover">
+    <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceModIcon">
+    <Setter Property="Width" Value="44" />
+    <Setter Property="Height" Value="44" />
+    <Setter Property="Background" Value="{DynamicResource ItemSelectedBrush}" />
+    <Setter Property="CornerRadius" Value="12" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instanceInstall">
+    <Setter Property="MinWidth" Value="92" />
+    <Setter Property="Height" Value="36" />
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instanceInstall:disabled">
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceActiveBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instanceToolbarIconButton">
+    <Setter Property="Width" Value="40" />
+    <Setter Property="Height" Value="40" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Background" Value="{DynamicResource SegmentedTrackBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="11" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.16" />
+        <BrushTransition Property="BorderBrush" Duration="0:0:0.16" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instanceToolbarIconButton:pointerover">
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceActiveBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instanceToolbarIconButton:pressed">
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceActiveBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instanceToolbarIconButton:disabled">
+    <Setter Property="Opacity" Value="0.5" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instanceToolbarIconButton Path.instanceToolbarIcon">
+    <Setter Property="Width" Value="16" />
+    <Setter Property="Height" Value="16" />
+    <Setter Property="Stretch" Value="Uniform" />
+    <Setter Property="Fill" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Fill" Duration="0:0:0.16" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instanceToolbarIconButton:pointerover Path.instanceToolbarIcon">
+    <Setter Property="Fill" Value="{DynamicResource TextPrimaryBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instanceToolbarIconButton.update Path.instanceToolbarIcon">
+    <Setter Property="Fill" Value="{DynamicResource SuccessSoftBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Path.instanceToolbarSpinner">
+    <Setter Property="Width" Value="16" />
+    <Setter Property="Height" Value="16" />
+    <Setter Property="Stretch" Value="Uniform" />
+    <Setter Property="Fill" Value="Transparent" />
+    <Setter Property="Stroke" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="StrokeThickness" Value="2.4" />
+    <Setter Property="StrokeLineCap" Value="Round" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Path.instanceButtonSpinner">
+    <Setter Property="Width" Value="16" />
+    <Setter Property="Height" Value="16" />
+    <Setter Property="Stretch" Value="Uniform" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Fill" Value="Transparent" />
+    <Setter Property="Stroke" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="StrokeThickness" Value="2.4" />
+    <Setter Property="StrokeLineCap" Value="Round" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Path.instanceButtonSpinner.light">
+    <Setter Property="Stroke" Value="{DynamicResource AccentForegroundBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceBadge">
+    <Setter Property="Padding" Value="6,2" />
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceBrush}" />
+    <Setter Property="CornerRadius" Value="7" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceBadge TextBlock">
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceBadge.update">
+    <Setter Property="Background" Value="{DynamicResource SuccessSurfaceBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceBadge.update TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource SuccessSoftBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceAlertBar">
+    <Setter Property="Padding" Value="14,12" />
+    <Setter Property="Background" Value="{DynamicResource ControlGroupBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="18" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+
+  <Style Selector="instances|InstancesView TextBlock.instanceAlertText">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceAlertBar.update TextBlock.instanceAlertText">
+    <Setter Property="Foreground" Value="{DynamicResource SuccessSoftBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView CheckBox.instanceSelectCheck">
+    <Setter Property="Width" Value="20" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="Padding" Value="0" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceModIcon">
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceModIcon Image">
+    <Setter Property="Width" Value="44" />
+    <Setter Property="Height" Value="44" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceModRow.selected">
+    <Setter Property="Background" Value="{DynamicResource ItemSelectedBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceModRow.selected:pointerover">
+    <Setter Property="Background" Value="{DynamicResource ItemSelectedHoverBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceModRow.catalog">
+    <Setter Property="MinHeight" Value="80" />
+    <Setter Property="Padding" Value="14" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceModRow.catalog Border.instanceModIcon">
+    <Setter Property="Width" Value="56" />
+    <Setter Property="Height" Value="56" />
+    <Setter Property="CornerRadius" Value="14" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceModRow.catalog Border.instanceModIcon Image">
+    <Setter Property="Width" Value="56" />
+    <Setter Property="Height" Value="56" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceModRow.catalog Border.instanceWorldPreview">
+    <Setter Property="Width" Value="100" />
+    <Setter Property="Height" Value="56" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceModRow.catalog Border.instanceWorldPreview Image">
+    <Setter Property="Width" Value="100" />
+    <Setter Property="Height" Value="56" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceModRow.catalog.incompatible">
+    <Setter Property="Opacity" Value="0.48" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceCatalogAuthorBadge">
+    <Setter Property="Padding" Value="4,3,7,3" />
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceActiveBrush}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceCatalogAuthorAvatar">
+    <Setter Property="Width" Value="22" />
+    <Setter Property="Height" Value="22" />
+    <Setter Property="Background" Value="{DynamicResource SuccessAvatarBrush}" />
+    <Setter Property="CornerRadius" Value="11" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceCatalogAuthorAvatar TextBlock">
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{DynamicResource SuccessAvatarForegroundBrush}" />
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceCatalogAuthorAvatar Image">
+    <Setter Property="Width" Value="22" />
+    <Setter Property="Height" Value="22" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceCatalogAuthorAvatar.modalAuthorAvatar">
+    <Setter Property="Width" Value="24" />
+    <Setter Property="Height" Value="24" />
+    <Setter Property="CornerRadius" Value="12" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceCatalogAuthorAvatar.modalAuthorAvatar Image">
+    <Setter Property="Width" Value="24" />
+    <Setter Property="Height" Value="24" />
+  </Style>
+
+  <Style Selector="instances|InstancesView TextBlock.instanceCatalogAuthorName">
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="TextWrapping" Value="NoWrap" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceModRow.disabled">
+    <Setter Property="Opacity" Value="0.62" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Path.instanceRowSpinner">
+    <Setter Property="Width" Value="20" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Stretch" Value="Uniform" />
+    <Setter Property="Fill" Value="Transparent" />
+    <Setter Property="Stroke" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="StrokeThickness" Value="2.2" />
+    <Setter Property="StrokeLineCap" Value="Round" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instanceModNameLink">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="RenderTransform" Value="{x:Null}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}"
+                Padding="{TemplateBinding Padding}">
+          <ContentPresenter Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instanceModNameLink TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="TextWrapping" Value="NoWrap" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Foreground" Duration="0:0:0.16" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instanceModNameLink:pointerover TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="TextDecorations" Value="Underline" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.installedModDeleteAction">
+    <Setter Property="Width" Value="36" />
+    <Setter Property="Height" Value="36" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="CornerRadius" Value="11" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.installedModDeleteAction:pointerover">
+    <Setter Property="Background" Value="{DynamicResource ControlGroupBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource DangerSoftBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ToggleSwitch.instanceModToggle">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceListFooter">
+    <Setter Property="Padding" Value="16,7" />
+    <Setter Property="BorderBrush" Value="{DynamicResource StrokeBrush}" />
+    <Setter Property="BorderThickness" Value="0,1,0,0" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceDropOverlay">
+    <Setter Property="Background" Value="{DynamicResource OverlayScrimBrush}" />
+    <Setter Property="IsHitTestVisible" Value="False" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Path.instanceDropIcon">
+    <Setter Property="Width" Value="34" />
+    <Setter Property="Height" Value="34" />
+    <Setter Property="Stretch" Value="Uniform" />
+    <Setter Property="Fill" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ComboBox.instanceFilterCombo">
+    <Setter Property="Height" Value="40" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.modCatalogInstallTable">
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.modCatalogInstallTableRow">
+    <Setter Property="Padding" Value="18,11" />
+    <Setter Property="Background" Value="{DynamicResource SurfaceElevatedBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,0,3" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.modCatalogInstallIcon">
+    <Setter Property="Width" Value="38" />
+    <Setter Property="Height" Value="38" />
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceBrush}" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.modCatalogInstallIcon TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.modCatalogDependencyBadge">
+    <Setter Property="MaxWidth" Value="170" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.modCatalogDependencyPopup">
+    <Setter Property="Width" Value="280" />
+    <Setter Property="Padding" Value="12" />
+    <Setter Property="Background" Value="{DynamicResource TooltipBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.18" Easing="CubicEaseOut" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView TextBlock.modCatalogDependencyDetails">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="LineHeight" Value="15" />
+    <Setter Property="FontWeight" Value="Normal" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.modCatalogDependencyIcon">
+    <Setter Property="Width" Value="32" />
+    <Setter Property="Height" Value="32" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceBrush}" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.modCatalogDependencyIcon TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.modCatalogInstallConfirmAction">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.18" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.modCatalogInstallResetAction">
+    <Setter Property="Width" Value="36" />
+    <Setter Property="Height" Value="36" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="FocusAdorner" Value="{x:Null}" />
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instancePreviewHero">
+    <Setter Property="Height" Value="320" />
+    <Setter Property="Background" Value="#0A0B0D" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Image.instancePreviewHeroImage">
+    <Setter Property="Opacity" Value="0" />
+    <Setter Property="IsHitTestVisible" Value="False" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.22">
+          <DoubleTransition.Easing><easing:CubicEaseOut /></DoubleTransition.Easing>
+        </DoubleTransition>
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView Image.instancePreviewHeroImage.loaded">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+
+  <Style Selector="instances|InstancesView TextBlock.instancePreviewSummary">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="LineHeight" Value="20" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.modPreviewInfoGroup Border.managerInfoCell">
+    <Setter Property="MinHeight" Value="60" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.modPreviewHeroSkeleton">
+    <Setter Property="IsHitTestVisible" Value="False" />
+    <Setter Property="Background">
+      <LinearGradientBrush StartPoint="0%,50%" EndPoint="100%,50%">
+        <GradientStop Color="{DynamicResource SkeletonEdgeColor}" Offset="0" />
+        <GradientStop Color="{DynamicResource PreviewSkeletonCenterColor}" Offset="0.5" />
+        <GradientStop Color="{DynamicResource SkeletonEdgeColor}" Offset="1" />
+      </LinearGradientBrush>
+    </Setter>
+    <Style.Animations>
+      <Animation Duration="0:0:1.35" IterationCount="Infinite">
+        <KeyFrame Cue="0%">
+          <Setter Property="Opacity" Value="0.42" />
+        </KeyFrame>
+        <KeyFrame Cue="50%">
+          <Setter Property="Opacity" Value="0.9" />
+        </KeyFrame>
+        <KeyFrame Cue="100%">
+          <Setter Property="Opacity" Value="0.42" />
+        </KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
+
+  <Style Selector="instances|InstancesView StackPanel.modPreviewContent">
+    <Setter Property="MinHeight" Value="140" />
+    <Setter Property="Opacity" Value="0" />
+    <Setter Property="IsHitTestVisible" Value="False" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.24">
+          <DoubleTransition.Easing><easing:CubicEaseOut /></DoubleTransition.Easing>
+        </DoubleTransition>
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView StackPanel.modPreviewContent.revealed">
+    <Setter Property="Opacity" Value="1" />
+    <Setter Property="IsHitTestVisible" Value="True" />
+  </Style>
+
+  <Style Selector="instances|InstancesView StackPanel.modPreviewFilesSkeleton">
+    <Setter Property="IsHitTestVisible" Value="False" />
+    <Setter Property="Opacity" Value="1" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.18">
+          <DoubleTransition.Easing><easing:CubicEaseOut /></DoubleTransition.Easing>
+        </DoubleTransition>
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView StackPanel.modPreviewFilesSkeleton.fading">
+    <Setter Property="Opacity" Value="0" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceCompatibilitySummary">
+    <Setter Property="Padding" Value="11,8" />
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceBrush}" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceCompatibilitySummary TextBlock">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instancePreviewImageSwitch">
+    <Setter Property="Padding" Value="4" />
+    <Setter Property="Background" Value="{DynamicResource SurfaceElevatedBrush}" />
+    <Setter Property="CornerRadius" Value="13" />
+    <Setter Property="BoxShadow" Value="{DynamicResource PopupShadow}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instancePreviewImageButton">
+    <Setter Property="Width" Value="38" />
+    <Setter Property="Height" Value="36" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="RenderTransform" Value="{x:Null}" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.16">
+          <BrushTransition.Easing><easing:CubicEaseOut /></BrushTransition.Easing>
+        </BrushTransition>
+      </Transitions>
+    </Setter>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}"
+                CornerRadius="{TemplateBinding CornerRadius}">
+          <ContentPresenter Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instancePreviewImageButton:pointerover">
+    <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Viewbox.instancePreviewImageSymbol">
+    <Setter Property="Width" Value="28" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="Stretch" Value="Uniform" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Path.instancePreviewImageGlyph">
+    <Setter Property="Fill" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="Opacity" Value="1" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Fill" Duration="0:0:0.16">
+          <BrushTransition.Easing><easing:CubicEaseOut /></BrushTransition.Easing>
+        </BrushTransition>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.16">
+          <DoubleTransition.Easing><easing:CubicEaseOut /></DoubleTransition.Easing>
+        </DoubleTransition>
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instancePreviewImageButton:disabled Path.instancePreviewImageGlyph">
+    <Setter Property="Fill" Value="{DynamicResource TextMutedBrush}" />
+    <Setter Property="Opacity" Value="0.45" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ItemsControl.instancePreviewFiles > ContentPresenter">
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instancePreviewVersionTable">
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instancePreviewFile">
+    <Setter Property="Padding" Value="18,12" />
+    <Setter Property="Margin" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,0,3" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="FocusAdorner" Value="{x:Null}" />
+    <Setter Property="RenderTransform" Value="{x:Null}" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.17">
+          <BrushTransition.Easing><easing:CubicEaseOut /></BrushTransition.Easing>
+        </BrushTransition>
+        <BrushTransition Property="BorderBrush" Duration="0:0:0.17">
+          <BrushTransition.Easing><easing:CubicEaseOut /></BrushTransition.Easing>
+        </BrushTransition>
+      </Transitions>
+    </Setter>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}"
+                BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}"
+                CornerRadius="{TemplateBinding CornerRadius}"
+                Padding="{TemplateBinding Padding}">
+          <ContentPresenter Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instancePreviewFile:pointerover">
+    <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instancePreviewFile.selected">
+    <Setter Property="Background" Value="{DynamicResource ItemSelectedBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instancePreviewFile.selected:pointerover">
+    <Setter Property="Background" Value="{DynamicResource ItemSelectedHoverBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instancePreviewFile.incompatible">
+    <Setter Property="Opacity" Value="0.58" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instancePreviewFile TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.modPreviewReleaseBadge">
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Padding" Value="8,4" />
+    <Setter Property="Background" Value="{DynamicResource WarningBadgeBrush}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="7" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.modPreviewReleaseBadge TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="TextWrapping" Value="NoWrap" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.modPreviewReleaseBadge.release">
+    <Setter Property="Background" Value="{DynamicResource SuccessBadgeBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.modPreviewReleaseBadge.release TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource SuccessSoftBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.modPreviewReleaseBadge.beta">
+    <Setter Property="Background" Value="{DynamicResource BetaSurfaceBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.modPreviewReleaseBadge.beta TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource BetaForegroundBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instanceInstall.preview">
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.modPreviewSplitAction">
+    <Setter Property="Background" Value="{DynamicResource ControlGroupBrush}" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instanceInstall.preview.splitMain">
+    <Setter Property="Height" Value="42" />
+    <Setter Property="MinWidth" Value="150" />
+    <Setter Property="Padding" Value="14,0" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="RenderTransform" Value="{x:Null}" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.18">
+          <BrushTransition.Easing><easing:CubicEaseOut /></BrushTransition.Easing>
+        </BrushTransition>
+      </Transitions>
+    </Setter>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}"
+                CornerRadius="{TemplateBinding CornerRadius}"
+                Padding="{TemplateBinding Padding}">
+          <ContentPresenter Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            Foreground="{TemplateBinding Foreground}"
+                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instanceInstall.preview.splitMain:pointerover">
+    <Setter Property="Background" Value="{DynamicResource PrimaryHoverBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.instanceInstall.preview.splitMain:pressed">
+    <Setter Property="Background" Value="{DynamicResource PrimaryPressedBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.modPreviewSplitDivider">
+    <Setter Property="Width" Value="2" />
+    <Setter Property="Background" Value="{DynamicResource AppBackgroundBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.modPreviewSourceAction">
+    <Setter Property="Height" Value="42" />
+    <Setter Property="Padding" Value="16,0" />
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Stretch" />
+    <Setter Property="RenderTransform" Value="{x:Null}" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.18">
+          <BrushTransition.Easing><easing:CubicEaseOut /></BrushTransition.Easing>
+        </BrushTransition>
+      </Transitions>
+    </Setter>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}"
+                CornerRadius="{TemplateBinding CornerRadius}"
+                Padding="{TemplateBinding Padding}">
+          <ContentPresenter Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            Foreground="{TemplateBinding Foreground}"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.modPreviewSourceAction:pointerover">
+    <Setter Property="Background" Value="{DynamicResource MainCardStrokeBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.modPreviewSourceAction:pressed">
+    <Setter Property="Background" Value="{DynamicResource MainCardStrokeBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Path.instanceInstalledCheck">
+    <Setter Property="Width" Value="16" />
+    <Setter Property="Height" Value="16" />
+    <Setter Property="Stretch" Value="Uniform" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Fill" Value="{DynamicResource TextMutedBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.instanceLoadMoreBar">
+    <Setter Property="Padding" Value="0,8" />
+    <Setter Property="Background" Value="{DynamicResource ControlGroupBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Grid.logsSearchContainer">
+    <Setter Property="Width" Value="280" />
+  </Style>
+
+  <Style Selector="instances|InstancesView.compact Grid.logsSearchContainer">
+    <Setter Property="Width" Value="170" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ToggleButton.logsLevelButton">
+    <Setter Property="Width" Value="220" />
+    <Setter Property="MinHeight" Value="44" />
+    <Setter Property="Padding" Value="14,6,42,6" />
+    <Setter Property="Background" Value="{DynamicResource SegmentedTrackBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="11" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="FocusAdorner" Value="{x:Null}" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="RenderTransform" Value="{x:Null}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Grid ColumnDefinitions="*,32">
+          <Border x:Name="ButtonBackground"
+                  Grid.ColumnSpan="2"
+                  Background="{TemplateBinding Background}"
+                  CornerRadius="{TemplateBinding CornerRadius}">
+            <Border.Transitions>
+              <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.18" />
+              </Transitions>
+            </Border.Transitions>
+          </Border>
+          <ContentPresenter Grid.Column="0"
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            Margin="{TemplateBinding Padding}"
+                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+          <PathIcon Grid.Column="1"
+                    Classes="logsLevelChevron"
+                    Data="{StaticResource ExpandMoreIcon}"
+                    IsHitTestVisible="False"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center" />
+        </Grid>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView ToggleButton.logsLevelButton:pointerover /template/ Border#ButtonBackground,
+                  instances|InstancesView ToggleButton.logsLevelButton:checked /template/ Border#ButtonBackground">
+    <Setter Property="Background" Value="{DynamicResource ControlTrackHoverBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView.compact ToggleButton.logsLevelButton">
+    <Setter Property="Width" Value="180" />
+  </Style>
+
+  <Style Selector="instances|InstancesView TextBlock.logsLevelSummary">
+    <Setter Property="MaxWidth" Value="130" />
+  </Style>
+
+  <Style Selector="instances|InstancesView.compact TextBlock.logsLevelSummary">
+    <Setter Property="MaxWidth" Value="86" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.logsLevelCountBadge">
+    <Setter Property="Padding" Value="6,2" />
+  </Style>
+
+  <Style Selector="instances|InstancesView PathIcon.logsLevelChevron">
+    <Setter Property="Width" Value="14" />
+    <Setter Property="Height" Value="14" />
+    <Setter Property="Margin" Value="0,0,14,0" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="RenderTransform" Value="rotate(0deg)" />
+    <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" />
+        <BrushTransition Property="Foreground" Duration="0:0:0.18" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView ToggleButton.logsLevelButton:pointerover PathIcon.logsLevelChevron">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ToggleButton.logsLevelButton:checked PathIcon.logsLevelChevron">
+    <Setter Property="RenderTransform" Value="rotate(180deg)" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Border.logsLevelPopup">
+    <Setter Property="Width" Value="220" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ToggleButton.logsIconButton,
+                  instances|InstancesView Button.logsIconButton">
+    <Setter Property="Width" Value="44" />
+    <Setter Property="Height" Value="44" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Background" Value="#00000000" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="FocusAdorner" Value="{x:Null}" />
+    <Setter Property="RenderTransform" Value="{x:Null}" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.16" />
+      </Transitions>
+    </Setter>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border x:Name="LogsButtonSurface"
+                Background="{TemplateBinding Background}"
+                CornerRadius="{TemplateBinding CornerRadius}">
+          <ContentPresenter x:Name="LogsButtonContent"
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            Foreground="{TemplateBinding Foreground}"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"
+                            IsHitTestVisible="False" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView ToggleButton.logsIconButton:pointerover,
+                  instances|InstancesView Button.logsIconButton:pointerover">
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceHoverBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ToggleButton.logsIconButton:checked">
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceActiveBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ToggleButton.logsIconButton:checked:pointerover">
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceHoverBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ToggleButton.logsIconButton:pressed,
+                  instances|InstancesView Button.logsIconButton:pressed">
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceActiveBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ToggleButton.logsIconButton:checked:pressed">
+    <Setter Property="Background" Value="{DynamicResource ControlSurfaceActiveBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.clearLogsIconButton:pressed">
+    <Setter Property="Background" Value="{DynamicResource DangerSurfaceBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource DangerSoftBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Button.clearLogsIconButton:pointerover">
+    <Setter Property="Background" Value="{DynamicResource DangerSurfaceBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource DangerSoftBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ToggleButton.logsIconButton:disabled,
+                  instances|InstancesView Button.logsIconButton:disabled">
+    <Setter Property="Opacity" Value="0.45" />
+    <Setter Property="Background" Value="#00000000" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ToggleButton.logsIconButton:disabled:pointerover,
+                  instances|InstancesView ToggleButton.logsIconButton:disabled:pressed,
+                  instances|InstancesView Button.logsIconButton:disabled:pointerover,
+                  instances|InstancesView Button.logsIconButton:disabled:pressed">
+    <Setter Property="Background" Value="#00000000" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView Path.logsToolbarIcon">
+    <Setter Property="Width" Value="17" />
+    <Setter Property="Height" Value="17" />
+    <Setter Property="Stretch" Value="Uniform" />
+    <Setter Property="Fill" Value="{Binding $parent[Button].Foreground}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Fill" Duration="0:0:0.16" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView Path.logsToolbarIcon.compact">
+    <Setter Property="Width" Value="15" />
+    <Setter Property="Height" Value="15" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ListBox.instanceLogList">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+    <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+    <Setter Property="ItemsPanel">
+      <ItemsPanelTemplate>
+        <VirtualizingStackPanel CacheLength="1" />
+      </ItemsPanelTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="instances|InstancesView ListBox.instanceLogList /template/ controls|SmoothScrollViewer">
+    <Setter Property="IsWheelEasingEnabled" Value="False" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ListBox.instanceLogList.wrap">
+    <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ListBox.instanceLogList > ListBoxItem">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Padding" Value="4,0" />
+    <Setter Property="Margin" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="Focusable" Value="True" />
+    <Setter Property="FontFamily" Value="JetBrains Mono" />
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ListBox.instanceLogList > ListBoxItem:pointerover">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ListBox.instanceLogList > ListBoxItem:selected">
+    <Setter Property="Background" Value="{DynamicResource ItemSelectedBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ListBox.instanceLogList SelectableTextBlock.logLevel,
+                  instances|InstancesView ListBox.instanceLogList SelectableTextBlock.logText,
+                  instances|InstancesView ListBox.instanceLogList SelectableTextBlock.logTime,
+                  instances|InstancesView ListBox.instanceLogList SelectableTextBlock.logSource">
+    <Setter Property="Focusable" Value="True" />
+    <Setter Property="Cursor" Value="Ibeam" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="TextWrapping" Value="NoWrap" />
+    <Setter Property="VerticalAlignment" Value="Top" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ListBox.instanceLogList SelectableTextBlock.logTime">
+    <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+    <Setter Property="Opacity" Value="0.75" />
+    <Setter Property="TextWrapping" Value="NoWrap" />
+    <Setter Property="VerticalAlignment" Value="Top" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ListBox.instanceLogList SelectableTextBlock.logLevel">
+    <Setter Property="Width" Value="44" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+    <Setter Property="TextWrapping" Value="NoWrap" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ListBox.instanceLogList SelectableTextBlock.logSource">
+    <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+    <Setter Property="TextWrapping" Value="NoWrap" />
+    <Setter Property="VerticalAlignment" Value="Top" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ListBox.instanceLogList SelectableTextBlock.logLevel.error">
+    <Setter Property="Foreground" Value="{DynamicResource DangerSoftBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ListBox.instanceLogList SelectableTextBlock.logLevel.warning">
+    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ListBox.instanceLogList SelectableTextBlock.logText">
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="TextWrapping" Value="NoWrap" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ListBox.instanceLogList.wrap SelectableTextBlock.logText">
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ListBox.instanceLogList SelectableTextBlock.logText.error">
+    <Setter Property="Foreground" Value="{DynamicResource DangerSoftBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ListBox.instanceLogList SelectableTextBlock.logText.warning">
+    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ListBox.instanceLogList SelectableTextBlock.logText.system">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <Style Selector="instances|InstancesView ListBox.instanceLogList SelectableTextBlock.logText.trace">
+    <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+  </Style>
+
+</Styles>

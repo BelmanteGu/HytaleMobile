@@ -1,0 +1,63 @@
+---
+title: Profiles
+description: Create, authenticate, select, copy, and remove player profiles
+---
+
+# Profiles
+
+A profile is the player identity Hyprism uses when starting an instance. The active profile appears at the bottom of the navigation rail
+
+## Create an offline profile
+
+1. Open **Profiles** and select **Add**
+2. Choose **Offline profile**
+3. Enter a name from 3 to 16 ASCII letters, digits, hyphens, or underscores, or use the dice button to generate one
+4. Create the profile
+
+Offline profiles can use a connected custom authentication service or the on-device [Local Node](/reference/local-node). They do not receive official entitlements, cloud identity, or centralized social features
+
+Invalid names turn red. Hover the warning icon to see the reason; **Create** becomes available when the name is valid.
+
+In the creation screen, press **Esc** to leave a focused name field. Press **Esc** again to return to profile type selection, then once more to close the screen.
+
+## Add an official profile
+
+1. Open **Profiles** and select **Add**
+2. Choose **Official Hytale account**
+3. Start sign-in
+4. Complete authorization in the system browser
+5. Return to Hyprism after the browser confirms success
+
+Hyprism saves the profiles returned by the account and refreshes the session when required. Official game downloads and launches require an entitled account
+
+Press **Esc** on the official account step to return to profile type selection. Press it again to close the creation screen.
+
+## Edit an offline profile
+
+1. Open **Profiles** and select an offline profile.
+2. Select **Edit** in the action row, compact menu, or profile card menu. You can also edit the active profile while a game is running; the running client keeps the identity passed to it at launch.
+3. Change the **Username** and **UUID**. The name must contain 3 to 16 English letters, digits, dashes, or underscores. The UUID must be valid. Use the dice buttons if you want new values.
+4. Select **Save** to apply the changes or **Cancel** to discard them. Invalid fields turn red; hover the warning icon to see why the current value is invalid. **Save** becomes available when both values are valid.
+
+The updated values appear on the profile card. If saving fails, read the error below the fields and try again.
+
+Official profiles use account-provided identity values and cannot be edited here.
+
+## Select and manage profiles
+
+In a compact window, the profile keeps its large avatar and name in the detail view. The main **Select** action is centered in the top bar. The button with three vertical dots on the right opens additional actions.
+
+- Select a card to view its type, play time, and UUID. Its active status and available actions update immediately.
+- Select **Select** to use that profile for future launches
+- Use **Copy UUID** when another tool needs the identity value
+- Use **Open Folder** to inspect profile-specific files
+- Open the three-dot menu on a card to edit an offline profile or delete an inactive profile without opening its detail view.
+- Drag the handle to save a different profile order
+
+The active profile cannot be deleted, and its compact menu omits **Delete**. Select another profile first. In the wide action row, the delete button shows only its icon.
+
+To delete an inactive profile, choose **Delete** in its action row, compact menu, or card menu. Review the name in the **Confirmation** overlay and choose **Delete** again. This also removes the profile's local files and cannot be undone. If deletion fails, the overlay stays open and shows an error.
+
+:::warning
+Do not share session files or authentication tokens from a profile directory. A bug report normally needs launcher logs, not account credentials
+:::

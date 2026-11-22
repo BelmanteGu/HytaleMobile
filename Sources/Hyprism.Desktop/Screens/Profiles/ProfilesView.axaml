@@ -1,0 +1,839 @@
+<!--
+Copyright (C) 2026 Hyprism Launcher
+SPDX-License-Identifier: GPL-3.0-only
+-->
+
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:profiles="using:Hyprism.Desktop.Screens.Profiles"
+             xmlns:controls="using:Hyprism.Desktop.Controls"
+             xmlns:easing="using:Avalonia.Animation.Easings"
+             x:Class="Hyprism.Desktop.Screens.Profiles.ProfilesView"
+             x:Name="ProfilesRoot"
+             Classes.switchingProfile="{Binding IsProfileSelectionSwitching}"
+             x:DataType="profiles:ProfilesViewModel"
+             SizeChanged="OnProfilesViewSizeChanged">
+  <UserControl.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://Hyprism.Desktop/Screens/Profiles/ProfilesTemplates.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </UserControl.Resources>
+
+  <UserControl.Styles>
+    <StyleInclude Source="avares://Hyprism.Desktop/Screens/Profiles/ProfilesStyles.axaml" />
+  </UserControl.Styles>
+
+  <Grid x:Name="ProfilesLayout" ColumnDefinitions="Auto,*" ClipToBounds="True">
+    <Border x:Name="ProfilesListPane"
+            Classes="profileListPane managerRail"
+            ClipToBounds="True"
+            IsVisible="{Binding HasProfiles}">
+      <Border.Transitions>
+        <Transitions>
+          <DoubleTransition Property="Opacity" Duration="0:0:0.15">
+            <DoubleTransition.Easing><easing:CubicEaseOut /></DoubleTransition.Easing>
+          </DoubleTransition>
+        </Transitions>
+      </Border.Transitions>
+      <Border.RenderTransform>
+        <TranslateTransform>
+          <TranslateTransform.Transitions>
+            <Transitions>
+              <DoubleTransition Property="X" Duration="0:0:0.19">
+                <DoubleTransition.Easing><easing:CubicEaseInOut /></DoubleTransition.Easing>
+              </DoubleTransition>
+            </Transitions>
+          </TranslateTransform.Transitions>
+        </TranslateTransform>
+      </Border.RenderTransform>
+      <ContentControl Classes="managerRailSurface">
+        <StackPanel Classes="managerRailList">
+          <ItemsControl x:Name="ProfilesItems" ItemsSource="{Binding Profiles}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel HorizontalAlignment="Stretch" Spacing="2" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="profiles:ProfileItemViewModel">
+                <Grid Classes="managerListItemHost" Classes.menuOpen="{Binding IsMenuOpen}">
+                <Button Classes="managerRailCategory managerListItem"
+                        Classes.managed="{Binding IsSelected}"
+                        Command="{Binding DataContext.SelectProfileCommand, ElementName=ProfilesRoot}"
+                        CommandParameter="{Binding}"
+                        Click="OnProfileSelectedClicked">
+                  <Grid Classes="managerListItemLayout"
+                        ColumnDefinitions="Auto,*,40"
+                        ColumnSpacing="12">
+                    <Border Classes="managerListDragTarget"
+                            Cursor="Arrow"
+                            PointerPressed="OnProfileDragHandlePressed"
+                            PointerMoved="OnProfileDragHandleMoved"
+                            PointerReleased="OnProfileDragHandleReleased">
+                      <Path Classes="managerListHandle" Data="{StaticResource DragIndicatorIcon}" />
+                    </Border>
+
+                    <Grid Grid.Column="1"
+                          Classes="managerListIdentity profileListIdentity"
+                          ColumnDefinitions="Auto,*">
+                        <Border Classes="profileAvatar profileListAvatar">
+                          <Grid>
+                            <Image IsVisible="{Binding HasAvatar}"
+                                   Source="{Binding Avatar}"
+                                   Stretch="UniformToFill"
+                                   IsHitTestVisible="False" />
+                            <TextBlock IsVisible="{Binding !HasAvatar}"
+                                       Text="{Binding Initial}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontSize="14"
+                                       FontWeight="Bold"
+                                       IsHitTestVisible="False" />
+                          </Grid>
+                        </Border>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                          <TextBlock Text="{Binding Name}"
+                                     Classes="settingsCategoryTitle managerListTitle"
+                                     FontSize="15"
+                                     FontWeight="SemiBold"
+                                     TextTrimming="CharacterEllipsis"
+                                     TextWrapping="NoWrap" />
+                          <TextBlock Text="{Binding AccountType}"
+                                     Classes="managerCategoryDescription"
+                                     TextTrimming="CharacterEllipsis"
+                                     TextWrapping="NoWrap" />
+                        </StackPanel>
+                    </Grid>
+
+                  </Grid>
+                </Button>
+
+                    <Border x:Name="ProfileMoreTarget"
+                            Classes="managerListMoreTarget profileMoreTarget"
+                            Classes.open="{Binding IsMenuOpen}"
+                            Cursor="Hand"
+                            PointerPressed="OnProfileMenuPointerPressed"
+                            PointerReleased="OnToggleProfileMenuPointerReleased">
+                      <PathIcon Classes="managerListMoreIcon" Data="{StaticResource MoreVerticalIcon}" />
+                    </Border>
+
+                    <controls:FadingPopup
+                                          Placement="BottomEdgeAlignedRight"
+                                          PlacementTarget="ProfileMoreTarget"
+                                          VerticalOffset="8"
+                                          IsRequestedOpen="{Binding IsMenuOpen, Mode=TwoWay}">
+                      <Border Classes="uiPopupSurface managerCompactActionFlyout">
+                        <StackPanel Spacing="2">
+                          <Button Classes="managerCompactMenuAction"
+                                  IsVisible="{Binding !IsOfficial}"
+                                  Command="{Binding DataContext.EditProfileCommand, ElementName=ProfilesRoot}"
+                                  CommandParameter="{Binding}"
+                                  Click="OnCloseProfileMenuClicked">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                              <Path Classes="managerCompactMenuIcon" Data="{StaticResource EditRoundedIcon}" />
+                              <TextBlock Text="{Binding DataContext.EditLabel, ElementName=ProfilesRoot}"
+                                         VerticalAlignment="Center" />
+                            </StackPanel>
+                          </Button>
+                          <Button Classes="managerCompactMenuAction danger"
+                                  IsVisible="{Binding !IsActive}"
+                                  Command="{Binding DataContext.RequestProfileDeletionCommand, ElementName=ProfilesRoot}"
+                                  CommandParameter="{Binding}"
+                                  Click="OnCloseProfileMenuClicked">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                              <Path Classes="managerCompactMenuIcon" Data="{StaticResource DeleteIcon}" />
+                              <TextBlock Text="{Binding DataContext.DeleteLabel, ElementName=ProfilesRoot}" />
+                            </StackPanel>
+                          </Button>
+                        </StackPanel>
+                      </Border>
+                    </controls:FadingPopup>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <Button Classes="formNavigationRow managerAddRow quietAction last"
+                  Click="OnCreateProfileClicked">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="9">
+              <Path Width="14" Height="14" Stretch="Uniform" Data="{StaticResource AddIcon}" />
+              <TextBlock Text="{Binding AddLabel}" Classes="formLabel" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </ContentControl>
+    </Border>
+
+    <Grid x:Name="ProfileMain"
+          Grid.Column="1"
+          Background="{DynamicResource SurfaceBrush}">
+      <Grid.RenderTransform>
+        <TranslateTransform>
+          <TranslateTransform.Transitions>
+            <Transitions>
+              <DoubleTransition Property="X" Duration="0:0:0.3">
+                <DoubleTransition.Easing><easing:CubicEaseInOut /></DoubleTransition.Easing>
+              </DoubleTransition>
+            </Transitions>
+          </TranslateTransform.Transitions>
+        </TranslateTransform>
+      </Grid.RenderTransform>
+
+      <Grid x:Name="ProfileOverview">
+        <Grid.Transitions>
+          <Transitions>
+            <DoubleTransition Property="Opacity" Duration="0:0:0.18">
+              <DoubleTransition.Easing><easing:CubicEaseInOut /></DoubleTransition.Easing>
+            </DoubleTransition>
+          </Transitions>
+        </Grid.Transitions>
+        <Grid.RenderTransform>
+          <TranslateTransform>
+            <TranslateTransform.Transitions>
+              <Transitions>
+                <DoubleTransition Property="X" Duration="0:0:0.18">
+                  <DoubleTransition.Easing><easing:CubicEaseInOut /></DoubleTransition.Easing>
+                </DoubleTransition>
+              </Transitions>
+            </TranslateTransform.Transitions>
+          </TranslateTransform>
+        </Grid.RenderTransform>
+        <controls:EmptyState IsVisible="{Binding IsEmptyStateVisible}"
+                             Title="{Binding NoProfilesLabel}"
+                             Description="{Binding CreateProfileHint}">
+          <controls:EmptyState.Icon>
+            <Path Width="56"
+                  Height="56"
+                  Stretch="Uniform"
+                  Fill="{DynamicResource TextSecondaryBrush}"
+                  Data="{StaticResource ProfilesIcon}" />
+          </controls:EmptyState.Icon>
+          <controls:EmptyState.ActionContent>
+            <Button Classes="primary"
+                    Click="OnCreateProfileClicked">
+              <StackPanel Orientation="Horizontal" Spacing="9">
+                <Path Classes="actionIcon" Width="17" Height="17" Stretch="Uniform" Data="{StaticResource AddIcon}" />
+                <TextBlock Text="{Binding CreateProfileLabel}" />
+              </StackPanel>
+            </Button>
+          </controls:EmptyState.ActionContent>
+        </controls:EmptyState>
+
+        <Grid x:Name="ProfileEditorContent"
+              IsVisible="{Binding IsProfileEditorVisible}"
+              RowDefinitions="Auto,*">
+          <Border x:Name="CompactProfilesToolbar"
+                  Classes="detailToolbar compact scrolled"
+                  IsVisible="False">
+            <Grid ColumnDefinitions="*,Auto,*">
+              <Button Classes="detailBack" HorizontalAlignment="Left" Click="OnCompactProfilesBackClicked">
+                <StackPanel Orientation="Horizontal" Spacing="9">
+                  <Path Width="12" Height="12" Stretch="Uniform" Data="{StaticResource NextIcon}">
+                    <Path.RenderTransform><RotateTransform Angle="180" /></Path.RenderTransform>
+                  </Path>
+                  <TextBlock Text="{Binding BackLabel}" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+
+              <Button x:Name="CompactProfilePrimaryAction"
+                      Grid.Column="1"
+                      Classes="managerCompactActionPart main standalone"
+                      Classes.active="{Binding SelectedProfile.IsActive}"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center"
+                      ToolTip.Tip="{Binding ActivationLabel}"
+                      Command="{Binding ActivateSelectedProfileCommand}">
+                <ContentControl Content="{Binding}"
+                                ContentTemplate="{StaticResource ProfileActivationActionTemplate}" />
+              </Button>
+
+              <Button x:Name="CompactProfileMoreButton"
+                      Grid.Column="2"
+                      Classes="managerCompactActionPart menu standalone"
+                      HorizontalAlignment="Right"
+                      VerticalAlignment="Center"
+                      Click="OnToggleCompactProfileMenuClicked">
+                <PathIcon Classes="managerCompactActionMenuIcon"
+                          Data="{StaticResource MoreVerticalIcon}" />
+              </Button>
+
+              <controls:FadingPopup x:Name="CompactProfileMenuPopup"
+                                Grid.Column="2"
+                                Placement="BottomEdgeAlignedRight"
+                                PlacementTarget="CompactProfileMoreButton"
+                                VerticalOffset="8">
+                <Border Classes="uiPopupSurface managerCompactActionFlyout">
+                  <StackPanel Spacing="2">
+                    <Button Classes="managerCompactMenuAction"
+                            Command="{Binding OpenProfileFolderCommand}"
+                            Click="OnCloseCompactProfileMenuClicked">
+                      <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Path Classes="managerCompactMenuIcon"
+                              Data="{StaticResource FolderOpenIcon}" />
+                        <TextBlock Text="{Binding FolderLabel}"
+                                   VerticalAlignment="Center" />
+                      </StackPanel>
+                    </Button>
+
+                    <Button Classes="managerCompactMenuAction"
+                            IsVisible="{Binding !SelectedProfile.IsOfficial}"
+                            Command="{Binding BeginEditingCommand}"
+                            Click="OnCloseCompactProfileMenuClicked">
+                      <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Path Classes="managerCompactMenuIcon"
+                              Data="{StaticResource EditRoundedIcon}" />
+                        <TextBlock Text="{Binding EditLabel}"
+                                   VerticalAlignment="Center" />
+                      </StackPanel>
+                    </Button>
+
+                    <Button x:Name="CompactProfileDeleteAction"
+                            Classes="managerCompactMenuAction danger"
+                            IsVisible="{Binding !SelectedProfile.IsActive}"
+                            Command="{Binding RequestProfileDeletionCommand}"
+                            CommandParameter="{Binding SelectedProfile}"
+                            Click="OnCloseCompactProfileMenuClicked">
+                      <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Path Classes="managerCompactMenuIcon"
+                              Data="{StaticResource DeleteIcon}" />
+                        <TextBlock Text="{Binding DeleteActionLabel}"
+                                   VerticalAlignment="Center" />
+                      </StackPanel>
+                    </Button>
+                  </StackPanel>
+                </Border>
+              </controls:FadingPopup>
+            </Grid>
+          </Border>
+
+          <controls:SmoothScrollViewer Grid.Row="1"
+                        HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="ProfilesContentHost"
+                        Margin="32,28,32,40"
+                        MaxWidth="720"
+                        HorizontalAlignment="Stretch"
+                        Spacing="22">
+              <StackPanel Spacing="22">
+                <Border Classes="profileAvatar profileHeroAvatar">
+                  <Grid>
+                    <Image IsVisible="{Binding SelectedProfile.HasAvatar}"
+                           Source="{Binding SelectedProfile.Avatar}"
+                           Stretch="UniformToFill" />
+                    <TextBlock IsVisible="{Binding !SelectedProfile.HasAvatar}"
+                               Text="{Binding SelectedProfile.Initial}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontSize="48"
+                               FontWeight="Bold" />
+                  </Grid>
+                </Border>
+
+                <StackPanel Classes="profileHeroIdentity" Spacing="4">
+                  <TextBlock Text="{Binding SelectedProfile.Name}"
+                             HorizontalAlignment="Center"
+                             FontSize="26"
+                             FontWeight="Bold"
+                             TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+
+                <Border Classes="managerWideSplitAction"
+                        HorizontalAlignment="Center">
+                  <StackPanel Classes="managerWideActions"
+                              Classes.actionActive="{Binding SelectedProfile.IsActive}"
+                              Orientation="Horizontal"
+                              HorizontalAlignment="Center"
+                              Spacing="0">
+                    <Button Classes="managerAction primary first"
+                            Classes.active="{Binding SelectedProfile.IsActive}"
+                            Command="{Binding ActivateSelectedProfileCommand}">
+                      <ContentControl Content="{Binding}"
+                                      ContentTemplate="{StaticResource ProfileActivationActionTemplate}" />
+                    </Button>
+
+                    <Border Classes="managerWideActionDivider" />
+
+                    <Button Classes="managerAction secondary middle"
+                            Command="{Binding OpenProfileFolderCommand}">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Path Classes="managerActionIcon" Data="{StaticResource FolderOpenIcon}" />
+                        <TextBlock Text="{Binding FolderLabel}"
+                                   VerticalAlignment="Center" />
+                      </StackPanel>
+                    </Button>
+
+                    <Border Classes="managerWideActionDivider editDivider"
+                            IsVisible="{Binding !SelectedProfile.IsOfficial}" />
+
+                    <Button Classes="managerAction secondary middle editAction"
+                            IsVisible="{Binding !SelectedProfile.IsOfficial}"
+                            Command="{Binding BeginEditingCommand}">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Path Classes="managerActionIcon" Data="{StaticResource EditRoundedIcon}" />
+                        <TextBlock Text="{Binding EditLabel}" VerticalAlignment="Center" />
+                      </StackPanel>
+                    </Button>
+
+                    <Border Classes="managerWideActionDivider deleteDivider" />
+
+                    <Button Classes="managerAction secondary danger last deleteAction"
+                            IsEnabled="{Binding !SelectedProfile.IsActive}"
+                            ToolTip.Tip="{Binding DeleteActionLabel}"
+                            Command="{Binding RequestProfileDeletionCommand}"
+                            CommandParameter="{Binding SelectedProfile}">
+                      <Path Classes="managerActionIcon" Data="{StaticResource DeleteIcon}" />
+                    </Button>
+                  </StackPanel>
+                </Border>
+
+                <Border Classes="managerInfoGroup">
+                  <Grid ColumnDefinitions="*,2,*" RowDefinitions="Auto,2,Auto">
+                    <Border Classes="managerInfoCell">
+                      <StackPanel Spacing="3">
+                        <TextBlock Text="{Binding EditorLabel}" Classes="managerInfoLabel" />
+                        <TextBlock Text="{Binding SelectedProfile.AccountType}" Classes="managerInfoValue" />
+                      </StackPanel>
+                    </Border>
+                    <Border Grid.Column="1" Background="{DynamicResource SurfaceBrush}" />
+                    <Border Grid.Column="2" Classes="managerInfoCell">
+                      <StackPanel Spacing="3">
+                        <TextBlock Text="{Binding PlayTimeLabel}" Classes="managerInfoLabel" />
+                        <TextBlock Text="{Binding SelectedProfile.PlayTime}" Classes="managerInfoValue" />
+                      </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="1" Grid.ColumnSpan="3" Background="{DynamicResource SurfaceBrush}" />
+
+                    <Border Grid.Row="2" Grid.ColumnSpan="3" Classes="managerInfoCell">
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <StackPanel Spacing="3">
+                          <TextBlock Text="{Binding UuidLabel}" Classes="managerInfoLabel" />
+                          <TextBlock Text="{Binding SelectedProfile.Uuid}"
+                                     Classes="managerInfoValue"
+                                     FontFamily="{DynamicResource JetBrainsMonoFont}"
+                                     FontSize="13" />
+                        </StackPanel>
+                        <Button Grid.Column="1"
+                                Classes="profileIconButton uuidCopyButton"
+                                ToolTip.Tip="{Binding CopyLabel}"
+                                Click="OnCopyUuidClicked">
+                          <Path Classes="uuidCopyIcon"
+                                Width="16"
+                                Height="16"
+                                Stretch="Uniform"
+                                Data="{StaticResource ContentCopyIcon}" />
+                        </Button>
+                      </Grid>
+                    </Border>
+                  </Grid>
+                </Border>
+
+                <controls:NoteCard IsVisible="{Binding SelectedProfile.IsOfficial}"
+                                   Classes="note"
+                                   Title="{Binding NoteTitle}">
+                  <TextBlock Text="{Binding OfficialLockedLabel}"
+                             FontSize="12"
+                             LineHeight="17" />
+                </controls:NoteCard>
+
+                <TextBlock IsVisible="{Binding IsStatusError}"
+                           Text="{Binding StatusMessage}"
+                           Foreground="{DynamicResource DangerSoftBrush}"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap" />
+              </StackPanel>
+            </StackPanel>
+          </controls:SmoothScrollViewer>
+        </Grid>
+      </Grid>
+
+      <Border x:Name="ProfileCreatorScreen"
+              Classes="wizardScreen"
+              IsVisible="False"
+              Opacity="0">
+        <Border.Transitions>
+          <Transitions>
+            <DoubleTransition Property="Opacity" Duration="0:0:0.18">
+              <DoubleTransition.Easing><easing:CubicEaseInOut /></DoubleTransition.Easing>
+            </DoubleTransition>
+          </Transitions>
+        </Border.Transitions>
+        <Border.RenderTransform>
+          <TranslateTransform X="36">
+            <TranslateTransform.Transitions>
+              <Transitions>
+                <DoubleTransition Property="X" Duration="0:0:0.18">
+                  <DoubleTransition.Easing><easing:CubicEaseInOut /></DoubleTransition.Easing>
+                </DoubleTransition>
+              </Transitions>
+            </TranslateTransform.Transitions>
+          </TranslateTransform>
+        </Border.RenderTransform>
+        <controls:SmoothScrollViewer HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+          <StackPanel MaxWidth="560"
+                      HorizontalAlignment="Stretch"
+                      VerticalAlignment="Center"
+                      Margin="32"
+                      Spacing="12">
+            <controls:WizardRevealIcon x:Name="ProfileWizardReveal"
+                                       AnimationPath="/Assets/Lotties/avatar-reveal.json" />
+
+            <StackPanel x:Name="ProfileCreationChoiceContent"
+
+                        IsVisible="{Binding IsCreateChoiceVisible}"
+                        Spacing="12">
+              <StackPanel.RenderTransform>
+                <TranslateTransform />
+              </StackPanel.RenderTransform>
+              <TextBlock Text="{Binding CreateProfileLabel}"
+                         HorizontalAlignment="Center"
+                         FontSize="26"
+                         FontWeight="Bold"
+                         TextAlignment="Center" />
+              <TextBlock Text="{Binding CreateProfileHint}"
+                         Classes="muted"
+                         MaxWidth="460"
+                         HorizontalAlignment="Center"
+                         TextAlignment="Center"
+                         TextWrapping="Wrap" />
+
+              <Border Classes="formGroup" Margin="0,16,0,0">
+                <StackPanel>
+                  <Button x:Name="BeginOfficialProfileCreationButton"
+                          Classes="formNavigationRow"
+                          Click="OnBeginOfficialProfileCreationClicked">
+                    <Grid ColumnDefinitions="28,*,Auto" ColumnSpacing="14">
+                      <Image Classes="profileChoiceIcon"
+                             Source="avares://Hyprism.Desktop/Assets/Fluent/globe.png"
+                             Stretch="Uniform" />
+                      <StackPanel Grid.Column="1" Spacing="3">
+                        <TextBlock Text="{Binding OfficialProfileLabel}" Classes="formLabel profileChoiceTitle" />
+                        <TextBlock Text="{Binding OfficialProfileHint}" Classes="formHint profileChoiceDescription" />
+                      </StackPanel>
+                      <Path Grid.Column="2" Classes="profileChoiceChevron" Data="{StaticResource NextIcon}" />
+                    </Grid>
+                  </Button>
+                  <Button x:Name="BeginOfflineProfileCreationButton"
+                          Classes="formNavigationRow last"
+                          Click="OnBeginOfflineProfileCreationClicked">
+                    <Grid ColumnDefinitions="28,*,Auto" ColumnSpacing="14">
+                      <Image Classes="profileChoiceIcon"
+                             Source="avares://Hyprism.Desktop/Assets/Fluent/profile.png"
+                             Stretch="Uniform" />
+                      <StackPanel Grid.Column="1" Spacing="3">
+                        <TextBlock Text="{Binding OfflineProfileLabel}" Classes="formLabel profileChoiceTitle" />
+                        <TextBlock Text="{Binding OfflineProfileHint}" Classes="formHint profileChoiceDescription" />
+                      </StackPanel>
+                      <Path Grid.Column="2" Classes="profileChoiceChevron" Data="{StaticResource NextIcon}" />
+                    </Grid>
+                  </Button>
+                </StackPanel>
+              </Border>
+
+              <Button x:Name="ProfileCreationCancelButton"
+                      Classes="wizardAction"
+                      HorizontalAlignment="Center"
+                      Margin="0,10,0,0"
+                      Command="{Binding CancelCreationCommand}">
+                <TextBlock Text="{Binding CancelLabel}" />
+              </Button>
+            </StackPanel>
+
+            <StackPanel x:Name="OfflineProfileCreationContent"
+
+                        IsVisible="{Binding IsOfflineCreationVisible}"
+                        Spacing="12">
+              <StackPanel.RenderTransform>
+                <TranslateTransform />
+              </StackPanel.RenderTransform>
+              <TextBlock Text="{Binding CreateOfflineTitle}"
+                         HorizontalAlignment="Center"
+                         FontSize="26"
+                         FontWeight="Bold"
+                         TextAlignment="Center" />
+              <TextBlock Text="{Binding CreateOfflineHint}"
+                         Classes="muted"
+                         MaxWidth="460"
+                         HorizontalAlignment="Center"
+                         TextAlignment="Center"
+                         TextWrapping="Wrap" />
+
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,16,0,0">
+                <controls:ModalTextField IsError="{Binding IsOfflineNameInvalid}"
+                                         ErrorMessage="{Binding OfflineNameErrorMessage}">
+                  <TextBox Text="{Binding OfflineProfileName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                           MaxLength="16"
+                           PlaceholderText="{Binding NamePlaceholder}" />
+                </controls:ModalTextField>
+                <Button Grid.Column="1"
+                        Classes="profileIconButton editorRandomizeButton"
+                        ToolTip.Tip="{Binding RandomizeNameLabel}"
+                        AutomationProperties.Name="{Binding RandomizeNameLabel}"
+                        Command="{Binding GenerateOfflineProfileNameCommand}">
+                  <Path Width="20" Height="20" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" Data="{StaticResource CasinoRoundedIcon}" />
+                </Button>
+              </Grid>
+
+              <TextBlock IsVisible="{Binding IsStatusError}"
+                         Text="{Binding StatusMessage}"
+                         Foreground="{DynamicResource DangerSoftBrush}"
+                         TextAlignment="Center"
+                         TextWrapping="Wrap" />
+
+              <StackPanel Orientation="Horizontal"
+                          HorizontalAlignment="Center"
+                          Margin="0,10,0,0"
+                          Spacing="10">
+                <Button x:Name="OfflineProfileCreationBackButton"
+                        Classes="wizardAction"
+                        Click="OnReturnToProfileCreationChoiceClicked">
+                  <TextBlock Text="{Binding BackLabel}" />
+                </Button>
+                <Button Classes="wizardAction create"
+                        IsEnabled="{Binding CanCreateOfflineProfile}"
+                        Command="{Binding CreateOfflineProfileCommand}">
+                  <TextBlock Text="{Binding CreateLabel}" />
+                </Button>
+              </StackPanel>
+            </StackPanel>
+
+            <StackPanel x:Name="OfficialProfileCreationContent"
+
+                        IsVisible="{Binding IsOfficialCreationVisible}"
+                        Spacing="12">
+              <StackPanel.RenderTransform>
+                <TranslateTransform />
+              </StackPanel.RenderTransform>
+              <TextBlock Text="{Binding AuthenticationTitle}"
+                         HorizontalAlignment="Center"
+                         FontSize="26"
+                         FontWeight="Bold"
+                         TextAlignment="Center" />
+              <TextBlock Text="{Binding AuthenticationHint}"
+                         Classes="muted"
+                         MaxWidth="460"
+                         HorizontalAlignment="Center"
+                         TextAlignment="Center"
+                         TextWrapping="Wrap" />
+
+              <Border Classes="formGroup" Margin="0,16,0,0">
+                <Border Classes="formRow last">
+                  <StackPanel Spacing="5">
+                    <TextBlock Text="{Binding OfficialProfileLabel}" Classes="formLabel" />
+                    <TextBlock Text="{Binding BrowserHint}" Classes="formHint" />
+                  </StackPanel>
+                </Border>
+              </Border>
+
+              <TextBlock IsVisible="{Binding IsStatusError}"
+                         Text="{Binding StatusMessage}"
+                         Foreground="{DynamicResource DangerSoftBrush}"
+                         TextAlignment="Center"
+                         TextWrapping="Wrap" />
+
+              <Grid x:Name="OfficialProfileSignInActions"
+                    Width="272"
+                    Height="50"
+                    ColumnDefinitions="112,10,150"
+                    HorizontalAlignment="Center"
+                    Margin="0,10,0,0">
+                <Button x:Name="OfficialProfileCreationBackButton"
+                        Classes="wizardAction"
+                        Click="OnReturnToProfileCreationChoiceClicked">
+                  <TextBlock Text="{Binding BackLabel}" />
+                </Button>
+
+                <Button x:Name="OfficialProfileSignInButton"
+                        Grid.Column="2"
+                        ZIndex="1"
+                        HorizontalAlignment="Right"
+                        Classes="wizardAction create officialSignInAction"
+                        Classes.active="{Binding IsAuthenticating}"
+                        Classes.cancelArmed="{Binding IsAuthenticationCancellationArmed}"
+                        PointerExited="OnAuthenticationActionPointerExited"
+                        Command="{Binding SignInWithHytaleCommand}">
+                  <ContentControl Content="{Binding}"
+                                  ContentTemplate="{StaticResource OfficialSignInActionTemplate}" />
+                </Button>
+              </Grid>
+            </StackPanel>
+          </StackPanel>
+        </controls:SmoothScrollViewer>
+      </Border>
+    </Grid>
+
+    <Border x:Name="ProfileDragPreview"
+            Grid.ColumnSpan="2"
+            Classes="managerDragPreview"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Top"
+            IsVisible="False"
+            IsHitTestVisible="False"
+            ZIndex="100">
+      <Border.RenderTransform>
+        <TranslateTransform />
+      </Border.RenderTransform>
+      <Grid Classes="managerListItemLayout" ColumnDefinitions="Auto,*,22" ColumnSpacing="12">
+        <Border Classes="managerListDragTarget">
+          <Path Classes="managerListHandle" Data="{StaticResource DragIndicatorIcon}" />
+        </Border>
+        <Grid Grid.Column="1"
+              Classes="managerListIdentity"
+              ColumnDefinitions="Auto,*">
+          <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+            <TextBlock x:Name="ProfileDragPreviewName"
+                       Classes="settingsCategoryTitle managerListTitle"
+                       FontSize="15"
+                       FontWeight="SemiBold"
+                       TextTrimming="CharacterEllipsis"
+                       TextWrapping="NoWrap" />
+            <TextBlock x:Name="ProfileDragPreviewType"
+                       Classes="managerCategoryDescription"
+                       TextTrimming="CharacterEllipsis"
+                       TextWrapping="NoWrap" />
+          </StackPanel>
+        </Grid>
+        <Path Grid.Column="2"
+              Classes="managerListMore"
+              Data="{StaticResource MoreVerticalIcon}" />
+      </Grid>
+    </Border>
+
+    <controls:OverlayModal x:Name="ProfileDeleteModal"
+                           Grid.ColumnSpan="2"
+                           IsOpen="{Binding IsProfileDeletionOpen}"
+                           DismissCommand="{Binding CancelProfileDeletionCommand}"
+                           Closed="OnProfileDeleteModalClosed"
+                           SheetMaxWidth="480"
+                           SheetMaxHeight="420"
+                           SheetMargin="12,20,12,0"
+                           ShoulderMaxWidth="522"
+                           HiddenOffset="500"
+                           ZIndex="220">
+      <controls:OverlayModal.ModalContent>
+        <Grid>
+          <Border Classes="editorModalContent">
+            <StackPanel Spacing="16">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <TextBlock Text="{Binding DeleteTitle}" FontSize="22" FontWeight="Bold"
+                           VerticalAlignment="Center" />
+                <Button Grid.Column="1" Classes="editorModalClose mirrorRemove"
+                        Command="{Binding CancelProfileDeletionCommand}"
+                        ToolTip.Tip="{Binding CancelLabel}"
+                        AutomationProperties.Name="{Binding CancelLabel}">
+                  <PathIcon Data="{StaticResource CloseIcon}" Width="15" Height="15" />
+                </Button>
+              </Grid>
+              <TextBlock Text="{Binding DeleteHint}" Classes="muted" TextWrapping="Wrap" />
+              <Border Background="{DynamicResource ControlSurfaceBrush}"
+                      CornerRadius="11" Padding="14,12">
+                <TextBlock Text="{Binding PendingProfileDeletion.Name}"
+                           FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+              </Border>
+              <TextBlock IsVisible="{Binding IsStatusError}"
+                         Text="{Binding StatusMessage}"
+                         Foreground="{DynamicResource DangerBrush}"
+                         TextWrapping="Wrap" />
+              <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+                <Button Classes="wizardAction" Command="{Binding CancelProfileDeletionCommand}">
+                  <TextBlock Text="{Binding CancelLabel}" />
+                </Button>
+                <Button Classes="wizardAction danger" Command="{Binding ConfirmProfileDeletionCommand}">
+                  <TextBlock Text="{Binding DeleteLabel}" />
+                </Button>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+          <Border Classes="editorModalOutline" />
+        </Grid>
+      </controls:OverlayModal.ModalContent>
+    </controls:OverlayModal>
+    <controls:OverlayModal x:Name="ProfileEditModal"
+                           Grid.ColumnSpan="2"
+                           IsOpen="{Binding IsEditing}"
+                           DismissCommand="{Binding CancelEditingCommand}"
+                           Closed="OnProfileEditModalClosed"
+                           SheetMaxWidth="560"
+                           SheetMaxHeight="600"
+                           SheetMargin="12,20,12,0"
+                           ShoulderMaxWidth="608"
+                           HiddenOffset="650"
+                           ZIndex="200">
+      <controls:OverlayModal.ModalContent>
+        <Grid>
+          <Border Classes="editorModalContent">
+            <StackPanel Spacing="16">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <TextBlock Text="{Binding ProfileEditorTitle}"
+                           FontSize="22"
+                           FontWeight="Bold"
+                           VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Classes="editorModalClose mirrorRemove"
+                        Command="{Binding CancelEditingCommand}"
+                        ToolTip.Tip="{Binding CancelLabel}"
+                        AutomationProperties.Name="{Binding CancelLabel}">
+                  <PathIcon Data="{StaticResource CloseIcon}" Width="15" Height="15" />
+                </Button>
+              </Grid>
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding ProfileNameLabel}" Classes="formLabel" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                  <controls:ModalTextField IsError="{Binding IsEditNameInvalid}"
+                                           ErrorMessage="{Binding EditNameErrorMessage}">
+                    <TextBox Text="{Binding EditName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             MaxLength="16"
+                             PlaceholderText="{Binding NamePlaceholder}" />
+                  </controls:ModalTextField>
+                  <Button Grid.Column="1"
+                          Classes="profileIconButton editorRandomizeButton"
+                          ToolTip.Tip="{Binding RandomizeNameLabel}"
+                          AutomationProperties.Name="{Binding RandomizeNameLabel}"
+                          Command="{Binding RandomizeEditNameCommand}">
+                    <Path Width="20" Height="20" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" Data="{StaticResource CasinoRoundedIcon}" />
+                  </Button>
+                </Grid>
+                <TextBlock Text="{Binding ProfileNameHint}" Classes="formHint" />
+              </StackPanel>
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding UuidLabel}" Classes="formLabel" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                  <controls:ModalTextField IsError="{Binding IsEditUuidInvalid}"
+                                           ErrorMessage="{Binding EditUuidErrorMessage}">
+                    <TextBox Text="{Binding EditUuid, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             FontFamily="{DynamicResource JetBrainsMonoFont}"
+                             FontSize="13" />
+                  </controls:ModalTextField>
+                  <Button Grid.Column="1"
+                          Classes="profileIconButton editorRandomizeButton"
+                          ToolTip.Tip="{Binding RandomizeUuidLabel}"
+                          AutomationProperties.Name="{Binding RandomizeUuidLabel}"
+                          Command="{Binding RandomizeEditUuidCommand}">
+                    <Path Width="20" Height="20" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" Data="{StaticResource CasinoRoundedIcon}" />
+                  </Button>
+                </Grid>
+                <TextBlock Text="{Binding UuidHint}" Classes="formHint" />
+              </StackPanel>
+              <TextBlock IsVisible="{Binding IsStatusError}"
+                         Text="{Binding StatusMessage}"
+                         Foreground="{DynamicResource DangerBrush}"
+                         TextWrapping="Wrap" />
+              <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+                <Button Classes="wizardAction" Command="{Binding CancelEditingCommand}">
+                  <TextBlock Text="{Binding CancelLabel}" />
+                </Button>
+                <Button Classes="wizardAction create" Command="{Binding SaveProfileCommand}" IsEnabled="{Binding CanSaveProfile}">
+                  <TextBlock Text="{Binding SaveLabel}" />
+                </Button>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+          <Border Classes="editorModalOutline" />
+        </Grid>
+      </controls:OverlayModal.ModalContent>
+    </controls:OverlayModal>
+  </Grid>
+</UserControl>

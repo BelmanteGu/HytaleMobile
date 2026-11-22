@@ -1,0 +1,130 @@
+---
+title: Android
+description: Сборка, установка и отладка лаунчера для Android и нативного хоста игры
+---
+
+# Android {/* #android */}
+
+В этом руководстве описано, как собрать лаунчер для Android и хост игры, установить файлы игры на устройство и пользоваться инструментами отладки. Архитектура описана на [странице об архитектуре Android](/architecture/android).
+
+## Требования {/* #prerequisites */}
+
+| Инструмент | Примечания |
+| --- | --- |
+| .NET 10 SDK с рабочей нагрузкой `android` | `dotnet workload install android` |
+| JDK 21 | Используется сборкой .NET Android и APK хоста |
+| Android SDK с build tools 35 и платформой 35 | Предоставляет `aapt2`, `d8`, `zipalign` и `apksigner` |
+| Android NDK | Используется самая новая установленная версия |
+| CMake, Ninja и Git | Для библиотек хоста |
+| Хост macOS или Linux | Скрипты читают `ANDROID_HOME` и `ANDROID_NDK_HOME` или используют стандартное расположение SDK на хосте. В Windows запускайте их в WSL 2 |
+| Устройство arm64 | Проверено на Galaxy S23 (Snapdragon 8 Gen 2, Adreno 740, Android 16) |
+
+## APK лаунчера {/* #launcher-apk */}
+
+```bash
+dotnet publish Sources/Hyprism.Android/Hyprism.Android.csproj -c Release \
+  -p:AndroidSdkDirectory=$HOME/Library/Android/sdk \
+  -p:JavaSdkDirectory=/path/to/jdk-21
+adb install -r Sources/Hyprism.Android/bin/Release/net10.0-android/publish/org.hyprism.launcher-Signed.apk
+```
+
+В сборках Release обрезка и AOT отключены, потому что Core использует отражение для JSON и служб. Marshal methods отключены, потому что тип приложения Avalonia для Android обобщённый.
+
+## APK хоста игры {/* #game-host-apk */}
+
+Один раз соберите библиотеки хоста, затем загрузчик и APK:
+
+```bash
+cd Sources/Hyprism.MachOLoader
+./deps.sh
+./build.sh
+JAVA_HOME=/path/to/jdk-21 android/build-apk.sh
+adb install -r out/hyprism-game.apk
+```
+
+`build.sh` создаёт `out/hyprism-macho`, загрузчик командной строки для проверок через `adb shell`, и `out/libmain.so` для APK. `build-apk.sh` без Gradle упаковывает исходники Java из SDL со стеком `SDLThread` 64 МиБ, `HytaleActivity` и `TlsBridge` хоста, `libSDL3.so`, `libmain.so`, `libmobileglues.so` и `libopenal.so`.
+
+## Файлы игры {/* #game-files */}
+
+Скопируйте установку Hytale для macOS (проверена сборка 34 ветки release) в каталог файлов хоста и переместите `Data` рядом с исполняемым файлом:
+
+```bash
+F=/sdcard/Android/data/org.hyprism.game/files
+adb shell mkdir -p $F/UserData
+adb push <instance>/Client $F/
+adb push <instance>/Assets.zip $F/Assets.zip
+adb shell "mv $F/Client/Hytale.app/Contents/Resources/Data $F/Client/Hytale.app/Contents/MacOS/Data"
+adb shell "chmod -R a+rwX $F/Client $F/UserData; chmod a+rw $F/Assets.zip"
+```
+
+Файлы, переданные через `adb`, принадлежат пользователю shell, поэтому изменение прав позволяет приложению хоста их читать. Не распространяйте файлы клиента.
+
+## Запуск {/* #running */}
+
+Войдите в лаунчере с официальной учётной записью, выберите экземпляр и нажмите **Launch**. Чтобы запустить хост без лаунчера, используйте `adb shell am start -n org.hyprism.game/.HytaleActivity`; в этом случае клиент останавливается на проверке аутентификации.
+
+Хост читает необязательные файлы из своего каталога файлов:
+
+| Файл | Назначение |
+| --- | --- |
+| `env.txt` | Строки `NAME=value`, задаваемые до запуска клиента |
+| `args.txt` | Дополнительные аргументы клиента, по одному в строке |
+| `MG/config.json` | Настройки MobileGlues, создаются с `customGLVersion` 41 |
+
+Полезные переменные окружения:
+
+| Переменная | Действие |
+| --- | --- |
+| `MACHO_SOFT_TRAPS=1` | Отсутствующие импорты возвращают 0 вместо завершения |
+| `MACHO_TRACE_ALL=1` | Записывает каждый вызов через связанный импорт, что сильно замедляет клиент |
+| `MACHO_TRACE=1` | Дополнительная диагностика прослоек в stderr |
+| `HYPRISM_UI_SCALE` | Сообщает координаты окна и мыши SDL в точках с этой плотностью; по умолчанию 1 (выключено), потому что интерфейс игры масштабируется по высоте области просмотра |
+| `HYPRISM_GL_TRACE=1` | Записывает под `[gl]` функции GL, которые разрешает клиент, первые загрузки текстур и изменения кадровых буферов, отрисовку в небольшие внеэкранные области просмотра и ошибки GL |
+| `DOTNET_gcConcurrent=0` | Отключает фоновую сборку мусора |
+
+NativeAOT читает значения `DOTNET_` как шестнадцатеричные без префикса `0x` и молча игнорирует значения, которые не может разобрать.
+
+## Отладка {/* #debugging */}
+
+| Журнал | Команда |
+| --- | --- |
+| Загрузчик и прослойки | `adb logcat -s HytaleLoader` |
+| Стандартный вывод клиента | `adb logcat -s Hytale` |
+| Файл журнала клиента | `adb shell run-as org.hyprism.game cat <files>/UserData/Logs/<date>_client.log` |
+| MobileGlues | `adb shell run-as org.hyprism.game cat <files>/MG/latest.log` |
+
+Загрузчик записывает следующую диагностику:
+
+- `UNIMPLEMENTED <symbol>` для импорта без прослойки.
+- `[signal] fault ...` с образом и смещением сбойной инструкции и трассировкой по указателям кадров. Когда среда выполнения .NET решает, что сбой не управляемый, она восстанавливает действие по умолчанию и процесс завершается без tombstone, поэтому эта запись остаётся единственным следом.
+- `[mem] ... failed` для неудачных вызовов памяти и `[fs] ... missing` для файлов, которые клиент ищет и не находит.
+- `[dyld] dlopen(...)` и `dlsym(...) not found` для загрузки библиотек.
+- `[tls] <host>: <error>` для неудавшегося сеанса TLS и `[tls] chain rejected` для цепочки сертификатов, которой платформа не доверяет.
+- `[net] <call>(fd) failed` для вызовов сокетов, завершившихся ошибкой, отличной от отсутствия данных.
+- `[gl] shader <id>: emulating an upper-left gl_FragCoord origin` для каждого переписанного фрагментного шейдера.
+
+Чтобы сопоставить смещение управляемого стека с кодом, дизассемблируйте клиент с помощью `llvm-objdump` по адресу `0x100000000 + offset` и посмотрите вызов перед адресом возврата.
+
+## Тесты {/* #tests */}
+
+Тесты на хосте работают на Mac с arm64 и сравнивают прослойки с собственными реализациями Apple:
+
+```bash
+cc -O1 -Wno-deprecated-declarations tests/crypto_vs_commoncrypto.c -Isrc -o /tmp/cctest && /tmp/cctest
+clang++ -std=c++17 -w -Isrc tests/cxx_string_vs_libcxx.cpp -o /tmp/cxxtest && /tmp/cxxtest
+```
+
+Тесты на устройстве собирают исходники загрузчика в небольшие исполняемые файлы для `adb shell`:
+
+| Тест | Что проверяет |
+| --- | --- |
+| `tests/vm_thunks_test.c` | Последовательность пула переходников NativeAOT через `vm_allocate`, `vm_remap` и `mprotect` |
+| `tests/errno_mirror_test.c` | Ячейку errno Darwin при обнулённых и неудачных вызовах и `EAGAIN` при чтении без данных |
+
+## Патчи {/* #patches */}
+
+`deps.sh` применяет файлы из [`Sources/Hyprism.MachOLoader/patches`](../../../../Sources/Hyprism.MachOLoader/patches) к загруженным зависимостям:
+
+| Патч | Исправление |
+| --- | --- |
+| `mobileglues-shader-source-count.patch` | `glShaderSource` передавал исходное число частей после объединения всех частей в одну строку, из-за чего драйвер читал за пределами массива для шейдеров из нескольких частей |

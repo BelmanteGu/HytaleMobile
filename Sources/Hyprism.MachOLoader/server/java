@@ -1,0 +1,20 @@
+#!/system/bin/sh
+# Copyright (C) 2026 Hyprism Launcher
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# Starts the local world server with the bundled JDK. Android's app seccomp
+# filter kills the process on get_mempolicy, which Shenandoah calls, so the
+# client's Shenandoah options are replaced with G1.
+J=/data/user/0/org.hyprism.game/files/jdk
+n=$#
+i=0
+while [ "$i" -lt "$n" ]; do
+    a=$1
+    shift
+    case "$a" in
+        -XX:+UseShenandoahGC|-XX:Shenandoah*) ;;
+        *) set -- "$@" "$a" ;;
+    esac
+    i=$((i + 1))
+done
+exec "$J/bin/java" -XX:+UseG1GC "$@"

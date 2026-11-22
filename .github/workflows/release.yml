@@ -1,0 +1,205 @@
+# Copyright (C) 2026 Hyprism Launcher
+# SPDX-License-Identifier: GPL-3.0-only
+
+name: Release Hyprism
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      prerelease:
+        description: 'Mark as prerelease'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.project_version.outputs.version }}
+      tag_name: ${{ steps.project_version.outputs.tag_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: preview
+
+      - name: Read and validate project version
+        id: project_version
+        run: |
+          set -euo pipefail
+
+          VERSION="$(dotnet msbuild Sources/Hyprism.Desktop/Hyprism.Desktop.csproj -nologo -getProperty:Version | tail -n 1 | tr -d '\r')"
+          if [ -z "$VERSION" ]; then
+            echo "ERROR: Hyprism.Desktop.csproj does not define Version"
+            exit 1
+          fi
+
+          EXPECTED_TAG="v$VERSION"
+          if [[ "${GITHUB_REF:-}" == refs/tags/* ]] && [ "$GITHUB_REF_NAME" != "$EXPECTED_TAG" ]; then
+            echo "ERROR: Tag $GITHUB_REF_NAME does not match Hyprism.Desktop.csproj version $VERSION"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag_name=$EXPECTED_TAG" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+
+  # ============================================================================
+  # Call the build workflow
+  # ============================================================================
+  build:
+    needs: version
+    uses: ./.github/workflows/build.yml
+    with:
+      platforms: 'all'
+
+  # ============================================================================
+  # Create GitHub Release
+  # ============================================================================
+  release:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: List release assets
+        run: |
+          echo "=== Release Assets ==="
+          find release-assets -type f | head -50 || echo "No files found"
+          ls -laR release-assets/ || true
+
+      - name: Flatten release assets
+        run: |
+          mkdir -p final-assets
+          find release-assets -type f \( \
+            -name "*.tar.xz" -o \
+            -name "*.deb" -o \
+            -name "*.rpm" -o \
+            -name "*.AppImage" -o \
+            -name "*.flatpak" -o \
+            -name "*.dmg" -o \
+            -name "*.zip" -o \
+            -name "*.msi" -o \
+            -name "*-setup.exe" \
+          \) -exec cp {} final-assets/ \;
+          echo "=== Final Assets ==="
+          ls -la final-assets/
+
+      - name: Generate version.json for auto-updater
+        run: |
+          VERSION="${{ needs.version.outputs.version }}"
+          TAG="${{ needs.version.outputs.tag_name }}"
+          REPO="${GITHUB_REPOSITORY}"
+          
+          cat > final-assets/version.json << EOF
+          {
+            "version": "$VERSION",
+            "releaseDate": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+              "linux": {
+                "x64": {
+                  "tar": "https://github.com/$REPO/releases/download/$TAG/Hyprism-linux-x64-$VERSION.tar.xz"
+                }
+              },
+              "windows": {
+                "x64": {
+                  "zip": "https://github.com/$REPO/releases/download/$TAG/Hyprism-win-x64-$VERSION.zip"
+                }
+              },
+              "macos": {
+                "arm64": {
+                  "dmg": "https://github.com/$REPO/releases/download/$TAG/Hyprism-mac-arm64-$VERSION.dmg"
+                }
+              },
+              "nix": {
+                "x86_64-linux": {
+                  "flake": "https://github.com/$REPO/tree/$TAG/Packaging/linux/flake"
+                }
+              }
+            }
+          }
+          EOF
+
+      - name: Detect missing builds
+        id: build_status
+        run: |
+          set -euo pipefail
+          
+          WARNINGS=""
+          
+          # Check what files we actually have
+          if ! ls final-assets/*linux*x64* >/dev/null 2>&1; then
+            WARNINGS="${WARNINGS}- Linux x64 build\n"
+          fi
+          if ! ls final-assets/*win* >/dev/null 2>&1; then
+            WARNINGS="${WARNINGS}- Windows x64 build\n"
+          fi
+          if ! ls final-assets/*mac* >/dev/null 2>&1; then
+            WARNINGS="${WARNINGS}- macOS ARM64 build\n"
+          fi
+          
+          if [ -n "$WARNINGS" ]; then
+            echo "warnings<<EOF" >> $GITHUB_OUTPUT
+            echo "### ⚠️ Missing Builds" >> $GITHUB_OUTPUT
+            echo "The following builds are not included in this release:" >> $GITHUB_OUTPUT
+            echo -e "$WARNINGS" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "warnings=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ needs.version.outputs.tag_name }}
+          name: Hyprism ${{ needs.version.outputs.tag_name }}
+          body: |
+            ## Hyprism ${{ needs.version.outputs.tag_name }}
+            
+            ${{ steps.build_status.outputs.warnings }}
+            
+            ### Downloads
+            
+            | Platform | Architecture | Format | Download |
+            |----------|-------------|--------|----------|
+            | **Windows** | x64 | Portable ZIP | [Hyprism-win-x64-${{ needs.version.outputs.version }}.zip](https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag_name }}/Hyprism-win-x64-${{ needs.version.outputs.version }}.zip) |
+            | **Windows** | x64 | MSI | [Hyprism-win-x64-${{ needs.version.outputs.version }}.msi](https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag_name }}/Hyprism-win-x64-${{ needs.version.outputs.version }}.msi) |
+            | **Windows** | x64 | EXE installer | [Hyprism-win-x64-${{ needs.version.outputs.version }}-setup.exe](https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag_name }}/Hyprism-win-x64-${{ needs.version.outputs.version }}-setup.exe) |
+            | **macOS** | ARM64 (Apple Silicon) | DMG | [Hyprism-mac-arm64-${{ needs.version.outputs.version }}.dmg](https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag_name }}/Hyprism-mac-arm64-${{ needs.version.outputs.version }}.dmg) |
+            | **Linux** | x64 | deb | [Hyprism-linux-x64-${{ needs.version.outputs.version }}.deb](https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag_name }}/Hyprism-linux-x64-${{ needs.version.outputs.version }}.deb) |
+            | **Linux** | x64 | rpm | [Hyprism-linux-x64-${{ needs.version.outputs.version }}.rpm](https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag_name }}/Hyprism-linux-x64-${{ needs.version.outputs.version }}.rpm) |
+            | **Linux** | x64 | AppImage | [Hyprism-linux-x64-${{ needs.version.outputs.version }}.AppImage](https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag_name }}/Hyprism-linux-x64-${{ needs.version.outputs.version }}.AppImage) |
+            | **Linux** | x64 | Flatpak bundle | [Hyprism-linux-x64-${{ needs.version.outputs.version }}.flatpak](https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag_name }}/Hyprism-linux-x64-${{ needs.version.outputs.version }}.flatpak) |
+            | **Linux** | x64 | tar.xz | [Hyprism-linux-x64-${{ needs.version.outputs.version }}.tar.xz](https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag_name }}/Hyprism-linux-x64-${{ needs.version.outputs.version }}.tar.xz) |
+            | **Linux** | x64 | Nix flake | [Packaging/linux/flake](https://github.com/${{ github.repository }}/tree/${{ needs.version.outputs.tag_name }}/Packaging/linux/flake) |
+
+            > For Nix users: Run the Nix package directly from this release with `nix run github:${{ github.repository }}?ref=${{ needs.version.outputs.tag_name }}&dir=Packaging/linux/flake`
+            
+            ### System Requirements
+            
+            | OS | Minimum version | Supported Architectures |
+            |----|-----------------|------------------------|
+            | Windows | Windows 10 22H2 or Windows 11 (latest cumulative updates recommended) | x64 |
+            | Linux | Ubuntu 22.04+, Debian 12+, Fedora 32+, NixOS 21.11+ | x64 |
+            | macOS | Sequoia 15+ | ARM64 (Apple Silicon) |
+            
+            > **Note**: Windows ARM64 and macOS Intel (x86_64) are **not supported** by the game
+          draft: false
+          prerelease: ${{ github.event.inputs.prerelease || false }}
+          artifacts: final-assets/*
+          allowUpdates: true
+          replacesArtifacts: true

@@ -1,0 +1,100 @@
+<!--
+Copyright (C) 2026 Hyprism Launcher
+SPDX-License-Identifier: GPL-3.0-only
+-->
+
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="using:Hyprism.Desktop.Shell"
+        xmlns:instances="using:Hyprism.Desktop.Screens.Instances"
+        xmlns:controls="using:Hyprism.Desktop.Controls"
+        xmlns:news="using:Hyprism.Desktop.Screens.News"
+        xmlns:profiles="using:Hyprism.Desktop.Screens.Profiles"
+        xmlns:settings="using:Hyprism.Desktop.Screens.Settings"
+        xmlns:animation="using:Avalonia.Animation"
+        xmlns:easing="using:Avalonia.Animation.Easings"
+        xmlns:lottie="clr-namespace:Avalonia.Labs.Lottie;assembly=Avalonia.Labs.Lottie"
+        x:Class="Hyprism.Desktop.Shell.MainWindow"
+        x:DataType="shell:MainWindowViewModel"
+        Title="Hyprism Launcher"
+        Width="1280"
+        Height="800"
+        MinWidth="1024"
+        MinHeight="700"
+        CanResize="True"
+        Background="{DynamicResource AppBackgroundBrush}"
+        WindowStartupLocation="CenterScreen"
+        ExtendClientAreaToDecorationsHint="True"
+        WindowDecorations="{OnPlatform Default=None, Windows=Full}">
+
+
+  <Grid x:Name="WindowRoot">
+  <shell:MainView x:Name="LauncherView" />
+
+  <Grid x:Name="WindowChrome"
+        Height="30"
+        VerticalAlignment="Top"
+        ColumnDefinitions="*,Auto"
+        ZIndex="2000">
+    <Border Grid.Column="0"
+            Background="Transparent"
+            WindowDecorationProperties.ElementRole="TitleBar" />
+
+    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="0">
+      <Button x:Name="MinimizeWindowButton"
+              Classes="window"
+              VerticalContentAlignment="Stretch"
+              Click="OnMinimizeClicked"
+              WindowDecorationProperties.ElementRole="MinimizeButton">
+        <Path x:Name="MinimizeWindowIcon"
+              Classes="windowIcon"
+              Width="11"
+              Height="1.5"
+              Margin="0,0,0,10"
+              VerticalAlignment="Bottom"
+              Stretch="Uniform"
+              Data="{StaticResource MinimizeIcon}" />
+      </Button>
+      <Button x:Name="MaximizeWindowButton"
+              Classes="window"
+              Click="OnMaximizeClicked"
+              WindowDecorationProperties.ElementRole="MaximizeButton">
+        <Grid Width="11" Height="11">
+          <Path x:Name="MaximizeWindowIcon"
+                Classes="windowIcon"
+                Width="11"
+                Height="11"
+                Stretch="Uniform"
+                Data="{StaticResource MaximizeIcon}" />
+          <Path x:Name="RestoreWindowIcon"
+                Classes="windowIcon"
+                Width="11"
+                Height="11"
+                Stretch="Uniform"
+                IsVisible="False"
+                Data="{StaticResource RestoreIcon}" />
+        </Grid>
+      </Button>
+      <Button x:Name="CloseWindowButton"
+              Classes="window"
+              Click="OnCloseClicked"
+              WindowDecorationProperties.ElementRole="CloseButton">
+        <Path Classes="windowIcon"
+              Width="11"
+              Height="11"
+              Stretch="Uniform"
+              Data="{StaticResource CloseIcon}" />
+      </Button>
+    </StackPanel>
+  </Grid>
+
+  <Border x:Name="ResizeNorth" ZIndex="2001" Height="6" VerticalAlignment="Top" Background="Transparent" Cursor="SizeNorthSouth" WindowDecorationProperties.ElementRole="ResizeN" />
+  <Border x:Name="ResizeSouth" ZIndex="2001" Height="6" VerticalAlignment="Bottom" Background="Transparent" Cursor="SizeNorthSouth" WindowDecorationProperties.ElementRole="ResizeS" />
+  <Border x:Name="ResizeWest" ZIndex="2001" Width="6" HorizontalAlignment="Left" Background="Transparent" Cursor="SizeWestEast" WindowDecorationProperties.ElementRole="ResizeW" />
+  <Border x:Name="ResizeEast" ZIndex="2001" Width="6" HorizontalAlignment="Right" Background="Transparent" Cursor="SizeWestEast" WindowDecorationProperties.ElementRole="ResizeE" />
+  <Border x:Name="ResizeNorthWest" ZIndex="2002" Width="10" Height="10" HorizontalAlignment="Left" VerticalAlignment="Top" Background="Transparent" Cursor="TopLeftCorner" WindowDecorationProperties.ElementRole="ResizeNW" />
+  <Border x:Name="ResizeNorthEast" ZIndex="2002" Width="10" Height="10" HorizontalAlignment="Right" VerticalAlignment="Top" Background="Transparent" Cursor="TopRightCorner" WindowDecorationProperties.ElementRole="ResizeNE" />
+  <Border x:Name="ResizeSouthWest" ZIndex="2002" Width="10" Height="10" HorizontalAlignment="Left" VerticalAlignment="Bottom" Background="Transparent" Cursor="BottomLeftCorner" WindowDecorationProperties.ElementRole="ResizeSW" />
+  <Border x:Name="ResizeSouthEast" ZIndex="2002" Width="10" Height="10" HorizontalAlignment="Right" VerticalAlignment="Bottom" Background="Transparent" Cursor="BottomRightCorner" WindowDecorationProperties.ElementRole="ResizeSE" />
+  </Grid>
+</Window>

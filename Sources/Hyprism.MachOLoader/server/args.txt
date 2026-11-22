@@ -1,0 +1,2 @@
+--java-exec
+/data/user/0/org.hyprism.game/files/java

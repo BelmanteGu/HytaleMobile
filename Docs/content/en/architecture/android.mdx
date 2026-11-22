@@ -1,0 +1,139 @@
+---
+title: Android
+description: How the Android launcher and the native game host run the macOS arm64 Hytale client on Android
+---
+
+# Android {/* #android */}
+
+Hyprism on Android is made of two apps. The launcher is the regular Hyprism UI built for Android, and the game host runs the macOS arm64 Hytale client natively on the device CPU through a Mach-O loader. No CPU emulator is involved: the client's arm64 instructions run directly, and only the operating system interfaces are translated.
+
+![Hytale main menu with the Worlds, Mods, Minigames, Servers and My Avatar buttons and the player's avatar, running on a Galaxy S23](/img/android/main-menu.png)
+
+This page describes the maintained design. The build steps are in the [Android development guide](/development/android).
+
+## Components {/* #components */}
+
+| Component | Source | Role |
+| --- | --- | --- |
+| Launcher APK | [`Sources/Hyprism.Android`](../../../../Sources/Hyprism.Android) | Avalonia head that compiles the shared UI from `Hyprism.Desktop`, signs in, and hands launches to the game host |
+| Game host APK | [`Sources/Hyprism.MachOLoader/android`](../../../../Sources/Hyprism.MachOLoader/android) | `SDLActivity` subclass that loads `libmain.so` and starts the client |
+| Mach-O loader | [`Sources/Hyprism.MachOLoader/src`](../../../../Sources/Hyprism.MachOLoader/src) | Maps the client and its bundled dylibs, applies fixups, and binds imports to shims |
+| Host libraries | Built by `deps.sh` | SDL 3.2.26, MobileGlues (desktop OpenGL on OpenGL ES), and OpenAL Soft 1.24.3 |
+
+The launcher keeps `Hyprism.Desktop` as its assembly name so `avares://Hyprism.Desktop/` resources and the `Hyprism.Desktop.Localization.Resources` names resolve without changes. The window content lives in `MainView`, which `MainWindow` hosts on desktop and the Android activity shows directly.
+
+## Launch flow {/* #launch-flow */}
+
+1. The launcher authenticates the selected official profile with the same Core services as desktop.
+2. `GameLauncher` detects the registered `IExternalGameHost` and, instead of starting a process, passes `--name`, `--uuid`, `--auth-mode`, `--identity-token`, and `--session-token` to `AndroidGameHost`.
+3. `AndroidGameHost` starts `org.hyprism.game/.HytaleActivity` with the arguments in the `org.hyprism.game.ARGUMENTS` intent extra.
+4. SDL calls `SDL_main` in `libmain.so` on its `SDLThread`, which has a 64 MiB stack. The host adds `--app-dir` and `--user-dir`, reads optional `env.txt` and `args.txt`, and calls the loader.
+5. The loader maps `HytaleClient`, runs its initializers, and calls its `main`.
+
+The game must run on `SDLThread` because SDL 3 forwards window calls from other threads to that thread and waits for it.
+
+The game files live in the host's external files directory, laid out like the macOS bundle:
+
+```text
+<files>/Client/Hytale.app/Contents/MacOS/HytaleClient
+<files>/Client/Hytale.app/Contents/MacOS/Data/
+<files>/Assets.zip
+<files>/UserData/
+<files>/MG/                 MobileGlues configuration, cache and log
+<files>/env.txt             optional NAME=value lines
+<files>/args.txt            optional extra client arguments
+```
+
+## Mach-O loader {/* #mach-o-loader */}
+
+The loader handles the executable and every bundled dylib the client opens with `dlopen`.
+
+| Feature | Detail |
+| --- | --- |
+| Containers | Thin arm64 Mach-O and universal binaries (the arm64 slice) |
+| Memory | Segments are copied into anonymous memory, because Android forbids executable mappings of app data files |
+| Fixups | `LC_DYLD_CHAINED_FIXUPS` (pointer formats 2 and 6) and classic `LC_DYLD_INFO_ONLY` rebase and bind opcodes |
+| Symbols | Exports tries, `@rpath` dependencies next to the loading image, and flat lookup |
+| Thread locals | One block per image and thread behind a `tlv_get_addr` thunk that preserves all registers except `x0`, `x16`, and `x17` |
+| Startup | `__init_offsets` and `__mod_init_func` initializers, then `LC_MAIN` |
+| Missing imports | A stub that logs the symbol name; with `MACHO_SOFT_TRAPS=1` it returns 0 instead of exiting |
+
+Imports from Darwin system libraries bind to shims. Imports between bundled dylibs bind to their exports. `dlopen` of a system library returns a virtual handle whose `dlsym` searches the shims.
+
+## Shim layers {/* #shim-layers */}
+
+Shims keep the Darwin calling convention and data layouts on one side and call Bionic on the other.
+
+| File | Covers |
+| --- | --- |
+| `shims.c` | libc functions with matching ABI, errno, pthread objects with Darwin static initializers, dyld services, ctype tables, Mach time |
+| `posix.c` | Files, `stat` and `dirent` layouts, `open` and `fcntl` flags, variadic stdio, `mmap`, Mach VM, `sysctl`, `sysconf`, users, `clonefile` and `fcopyfile` |
+| `signals.c` | Signal numbers and flags, and a host handler that converts between Linux and Darwin `ucontext` and records native faults |
+| `net.c` | `sockaddr` layouts, socket options, `msghdr`, `getaddrinfo`, interfaces, and `kqueue` over `epoll` |
+| `crypto.c` | CommonCrypto digests, HMAC, PBKDF2, AES, and random bytes |
+| `cf.c`, `objc.c` | A small CoreFoundation and Objective-C runtime with the Foundation classes the client messages |
+| `cxx.c` | The libc++ functions bundled dylibs import, on Apple's alternate `std::string` layout |
+| `dyld.c` | `dlopen` and `dlsym`, library replacements, and bundled dylib loading |
+| `gl.c` | OpenGL entry points with Darwin stack argument layouts, an upper-left `gl_FragCoord` origin, and optional upload tracing |
+| `security.c` | SecureTransport, `SecTrust`, and `SecCertificate` over the platform TLS engine and trust store, and `SecKey`, `SecItem`, and in-memory keychains over the platform crypto provider |
+| `sdl_scale.c` | Routes `SDL_GL_GetProcAddress` through `gl.c` and optionally reports window and mouse coordinates in points |
+
+Key compatibility rules that the shims implement:
+
+- Darwin variadic functions pass every variadic argument on the stack. `printf`, `open`, `fcntl`, and similar functions enter through assembly that hands the caller's stack pointer to C.
+- Darwin packs stack arguments at their natural size, while AAPCS64 gives each one an 8-byte slot. A function with more than eight integer arguments and two or more 4-byte values on the stack enters through a `STACK_ARGS` trampoline that hands the caller's stack area to C. This covers `glTexSubImage3D`, `glCompressedTexSubImage3D`, `glBlitFramebuffer`, `glCopyImageSubData`, and `CCCryptorCreateWithMode`; without it the client's interface atlas was uploaded with the wrong pixel type and stayed empty.
+- Linux and Darwin share errno values 1 to 34 except 11, which is `EAGAIN` on Linux and `EDEADLK` on Darwin. Translating it wrongly turns every would-block socket read into an unknown socket error.
+- `setjmp` and `longjmp` keep their own register layout inside Darwin's 192-byte `jmp_buf`, which is smaller than Bionic's.
+- `___chkstk_darwin` receives the allocation size in `x9`, in bytes.
+- The errno slot keeps Darwin numbering. The host errno is reset to a sentinel on every `__error()` access, so a failure after the program cleared errno is never lost.
+- `isalpha` and related functions are inline on Darwin and read `_DefaultRuneLocale.__runetype` at offset `0x3c` with Darwin `_CTYPE_*` bits.
+- The NativeAOT thunk pool needs `vm_allocate` and `vm_remap` results aligned to 16 KiB, with the code copy read-execute and the data half read-write.
+- `CC_*_CTX` and `CCHmacContext` states fit inside the caller's structures without pointers, because callers copy them.
+
+## Library replacements {/* #library-replacements */}
+
+| Bundled macOS library | On Android |
+| --- | --- |
+| `libSDL3.dylib` | `libSDL3.so` (SDL 3.2.26) |
+| `libopenal.dylib` | `libopenal.so` (OpenAL Soft 1.24.3, OpenSL ES) |
+| `libicucore` | Not available; the loader enables .NET invariant globalization |
+| `OpenGL.framework` | MobileGlues, which also provides the EGL layer SDL uses |
+| `libsodium.dylib`, `libwuffs.dylib`, `Noesis.dylib`, and other plain C dylibs | Loaded as Mach-O by the loader |
+
+A bundled dylib that links a replaced library binds to the same Android library. `libSDL3_image.dylib` links `libSDL3.dylib`, and loading the macOS SDL as a second copy made image saving fail with `That operation is not supported`.
+
+The host sets `SDL_OPENGL_LIBRARY` and `SDL_EGL_LIBRARY` to `libmobileglues.so` and writes `MG/config.json` with `customGLVersion` 41, because the client requires an OpenGL 4.1 core context.
+
+## Graphics {/* #graphics */}
+
+The client renders with OpenGL 4.1 core through MobileGlues, which translates GLSL to OpenGL ES. `gl.c` adapts the calls where the two differ:
+
+| Difference | Handling |
+| --- | --- |
+| Functions with more than eight integer arguments read packed Darwin stack arguments | `STACK_ARGS` trampolines for `glTexSubImage3D`, `glCompressedTexSubImage3D`, `glBlitFramebuffer`, and `glCopyImageSubData` |
+| OpenGL ES has no `layout(origin_upper_left)` for `gl_FragCoord` | A fragment shader that declares it gets a macro that flips y against the viewport height, kept in a uniform through `glViewport` and `glUseProgram` |
+| GLSL ES has no uniform initializers, so `uniform float uOpacity = 1.0;` reads as 0 | The constant values are parsed from the source and set with `glUniform*` after every `glLinkProgram` |
+
+The interface batcher shader tests text masks and scissors in top-left window coordinates. Without the flip, only elements near the vertical center of the screen passed those tests. Without the initializers, the avatar preview drew with a global transparency of 0.
+
+## TLS and certificates {/* #tls-and-certificates */}
+
+The client's `SslStream` uses SecureTransport and validates every server chain itself after the handshake, as on macOS. `security.c` implements those APIs over `org.hyprism.game.TlsBridge` in the host APK, through JNI:
+
+1. `SSLHandshake`, `SSLRead`, and `SSLWrite` move bytes between the client's I/O callbacks and an `SSLEngine`. The engine accepts any certificate, because the client rejects untrusted chains in the next step.
+2. `SSLCopyPeerTrust` returns the server certificates. The client then calls `SecTrustCreateWithCertificates` and `SecTrustEvaluateWithError`.
+3. `TlsBridge.verify` builds and validates the chain with `X509TrustManagerExtensions` and the Android trust store, or with the custom anchors that `SecTrustSetAnchorCertificates` sets.
+4. `SecTrustCopyResult` reports a failure as `AnchorTrusted` on the root or `TemporalValidity` on the leaf, which .NET maps to its chain status flags.
+
+Keys for the client's session certificate go through `org.hyprism.game.KeyBridge`. A key holds Apple's external representation (`04||X||Y||K` for EC, PKCS#1 for RSA). `SecItemExport` writes private keys as a PBES2 `EncryptedPrivateKeyInfo` (PBKDF2-HMAC-SHA256 and AES-256-CBC), because .NET decrypts that export and also uses it to move a key into its temporary keychain. PBKDF2 is computed over SHA-256 directly, because the platform provider rejects the empty password .NET uses.
+
+`TlsBridge` and `KeyBridge` are resolved on `SDLThread` before the client starts, because the client's network threads do not see the app classes. Server-side TLS and client certificates are not supported.
+
+## Current limits {/* #current-limits */}
+
+- Local worlds do not start, because the client runs the world server as a separate process.
+- The session certificate is not created yet: the client cannot decrypt the private key export, so servers reject the connection with `Client certificate required for mTLS connection`.
+- CoreText font enumeration is not implemented.
+- The Android status bar covers the top of the game.
+- The launcher stays in the launching state after handing off a game.
+- Touch input reaches the client as SDL mouse events only.

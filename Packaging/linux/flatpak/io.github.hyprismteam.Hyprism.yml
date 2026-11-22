@@ -1,0 +1,31 @@
+# Copyright (C) 2026 Hyprism Launcher
+# SPDX-License-Identifier: GPL-3.0-only
+
+app-id: io.github.hyprismteam.Hyprism
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+command: hyprism
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=x11
+  - --socket=pulseaudio
+  - --device=dri
+  - --filesystem=xdg-documents
+modules:
+  - name: hyprism
+    buildsystem: simple
+    build-commands:
+      - install -d /app/lib/hyprism /app/bin
+      - cp -a . /app/lib/hyprism/
+      - ln -s '../lib/hyprism/Hyprism Launcher' /app/bin/hyprism
+      - install -Dm644 io.github.hyprismteam.Hyprism.desktop /app/share/applications/io.github.hyprismteam.Hyprism.desktop
+      - install -Dm644 io.github.hyprismteam.Hyprism.svg /app/share/icons/hicolor/scalable/apps/io.github.hyprismteam.Hyprism.svg
+    sources:
+      - type: dir
+        path: publish
+      - type: file
+        path: io.github.hyprismteam.Hyprism.desktop
+      - type: file
+        path: io.github.hyprismteam.Hyprism.svg
