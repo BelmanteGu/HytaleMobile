@@ -5,7 +5,7 @@ SPDX-License-Identifier: GPL-3.0-only
 
 <div align="center">
 
-<img src="docs/media/icon.png" width="128" alt="HytaleMobile icon">
+<img src="docs/media/logo.png" width="420" alt="Hytale: Out of the Breach logo">
 
 # HytaleMobile
 
@@ -159,6 +159,7 @@ The game files go to `/sdcard/Android/data/org.hyprism.game/files` (see the guid
 ## ⚖️ Legal
 
 - Hytale © Hypixel Studios. This project is **not affiliated with or endorsed by** Hypixel Studios.
+- The Hytale logo at the top of this page is © Hypixel Studios and is used only to identify the game.
 - This repository contains **no** game code or assets. The client and server are loaded from the user's own files; `patch-server-jar.py` modifies a copy on the user's machine and nothing from the jar is distributed.
 - The launcher and loader are GPL-3.0, like Hyprism. Third-party components keep their own licenses, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
