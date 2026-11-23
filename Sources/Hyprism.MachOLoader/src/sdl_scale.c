@@ -11,6 +11,7 @@
 #include <dlfcn.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "macho.h"
 
@@ -181,6 +182,41 @@ static SDL_FunctionPointer w_GL_GetProcAddress(const char *proc)
 }
 
 /// Returns a wrapper for an SDL entry point, or NULL to use SDL directly.
+// HYPRISM_PERF=1 logs the frame rate every two seconds: frames per second, the average and worst
+// interval between buffer swaps, and how long SDL_GL_SwapWindow blocked (waiting for the GPU or vsync).
+static bool w_GL_SwapWindow(SDL_Window *window)
+{
+    REAL(SDL_GL_SwapWindow);
+    static struct timespec last, window_start;
+    static unsigned frames;
+    static double sum_interval, max_interval, sum_swap;
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    bool ok = real_SDL_GL_SwapWindow(window);
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    double swap_ms = (t1.tv_sec - t0.tv_sec) * 1e3 + (t1.tv_nsec - t0.tv_nsec) / 1e6;
+    if (last.tv_sec) {
+        double dt = (t1.tv_sec - last.tv_sec) * 1e3 + (t1.tv_nsec - last.tv_nsec) / 1e6;
+        sum_interval += dt;
+        if (dt > max_interval)
+            max_interval = dt;
+        sum_swap += swap_ms;
+        frames++;
+    }
+    last = t1;
+    if (!window_start.tv_sec)
+        window_start = t1;
+    double elapsed = (t1.tv_sec - window_start.tv_sec) + (t1.tv_nsec - window_start.tv_nsec) / 1e9;
+    if (elapsed >= 2.0 && frames) {
+        macho_log("perf", "fps %.1f  frame avg %.1f ms max %.1f ms  swap wait avg %.1f ms", frames / elapsed,
+                  sum_interval / frames, max_interval, sum_swap / frames);
+        frames = 0;
+        sum_interval = max_interval = sum_swap = 0;
+        window_start = t1;
+    }
+    return ok;
+}
+
 void *sdl_scale_lookup(void *sdl_handle, const char *symbol)
 {
     if (!g_sdl) {
@@ -193,6 +229,8 @@ void *sdl_scale_lookup(void *sdl_handle, const char *symbol)
     }
     if (strcmp(symbol, "SDL_GL_GetProcAddress") == 0)
         return (void *)w_GL_GetProcAddress;
+    if (strcmp(symbol, "SDL_GL_SwapWindow") == 0 && getenv("HYPRISM_PERF"))
+        return (void *)w_GL_SwapWindow;
     if (g_scale == 1.0f)
         return NULL;
     for (size_t i = 0; i < SHIM_COUNT(k_wrappers); i++)
