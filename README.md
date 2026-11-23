@@ -24,9 +24,9 @@ A Mach-O loader translates only the operating system, and a bundled Java 25 runs
 <a href="Docs/content/en/development/android.mdx"><img src="https://img.shields.io/badge/build-from%20source-1e1a26?style=for-the-badge&labelColor=3a3540" alt="Build from source"></a>
 <a href="https://www.youtube.com/@belmante"><img src="https://img.shields.io/badge/youtube-Projeto%20Belmante-FF8A1F?style=for-the-badge&logo=youtube&logoColor=white&labelColor=3a3540" alt="Projeto Belmante on YouTube"></a>
 
-<img src="docs/media/evolution/13-albedo-debug-colors.jpg" width="820" alt="A Hytale world on a Galaxy S23: grass, dirt, flowers and a stone tower">
+<img src="docs/media/evolution/14-lighting-fixed.jpg" width="820" alt="A Hytale forest on a Galaxy S23 with sunlight, sky ambient light and tree shadows">
 
-<sub>A local world on a Galaxy S23, with the server running on the phone. This frame shows the world's own colours (the lighting pass is still being fixed, see <a href="#-status">Status</a>).</sub>
+<sub>A local world on a Galaxy S23, with the server running on the phone and the game's own lighting: sunlight, sky ambient and shadows.</sub>
 
 </div>
 
@@ -69,6 +69,9 @@ From the first window to a local world with the server on the phone, in order:
 | 11 | On-screen gamepad: the game sees an Xbox controller | <img src="docs/media/evolution/11-touch-gamepad.jpg" width="260"> |
 | 12 | Exploring and fighting (and losing) | <img src="docs/media/evolution/12-combat.jpg" width="260"> |
 | 13 | Lighting debug: the world's real colours, with lighting isolated | <img src="docs/media/evolution/13-albedo-debug-colors.jpg" width="260"> |
+| 14 | Lighting fixed: the client's light target was `GL_RGB10`, which OpenGL ES can't render to; the loader now maps it to `RGB10_A2` | <img src="docs/media/evolution/14-lighting-fixed.jpg" width="260"> |
+| 15 | Block light from torches inside ruins | <img src="docs/media/evolution/15-torchlit-ruins.jpg" width="260"> |
+| 16 | Forest with the on-screen stick and sunlight through the trees | <img src="docs/media/evolution/16-forest-touch-stick.jpg" width="260"> |
 
 The detailed log, in Portuguese, is in [progress/PROGRESS.md](progress/PROGRESS.md).
 
@@ -152,7 +155,7 @@ The game files go to `/sdcard/Android/data/org.hyprism.game/files` (see the guid
 | ✅ | Local worlds with the server on the phone |
 | ✅ | On-screen gamepad, Bluetooth/USB controllers |
 | ✅ | ~60 FPS at 50% render scale and 64-block view distance |
-| 🚧 | **World lighting**: terrain is drawn but the deferred light term reaches the screen as zero, so the world looks dark. Albedo and shadows are correct (screenshot 13); the light buffer is being investigated |
+| ✅ | World lighting: sun, sky ambient, torch light and shadows (the deferred "full light" target was `GL_RGB10`, which OpenGL ES can't render to) |
 | 🚧 | Signing in from the phone's browser: Cloudflare's check doesn't finish in Chrome; signing in on a computer with `adb forward` works |
 | 🚧 | The client closes with *Broken pipe* if the local server stops |
 

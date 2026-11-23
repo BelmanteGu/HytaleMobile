@@ -846,6 +846,39 @@ static void t_DrawElementsInstancedBaseVertex(GLenum mode, GLsizei count, GLenum
     draw_report("glDrawElementsInstancedBaseVertex", mode, count);
 }
 
+// Always installed (not only with HYPRISM_GL_TRACE).
+//
+// GL_RGB10 (0x8052) is a desktop-only render target format: OpenGL ES 3.x has no colour-renderable
+// RGB10, so the client's deferred "full light" target (attachment 2 of the G-buffer) was never
+// written and every lit surface came out black. Use RGB10_A2, which has the same colour depth and is
+// renderable, with the same format/type pair the G-buffer's normal target already uses.
+static void (*real_TexImage2D_rgb10)(GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, const void *);
+
+static void fix_TexImage2D(GLenum target, GLint level, GLint internal, GLsizei w, GLsizei h, GLint border,
+                           GLenum format, GLenum type, const void *pixels)
+{
+    if (internal == 0x8052 && !pixels) {
+        internal = 0x8059; // GL_RGB10_A2
+        format = 0x1908;   // GL_RGBA
+        type = 0x8036;     // GL_UNSIGNED_INT_10_10_10_2
+    }
+    real_TexImage2D_rgb10(target, level, internal, w, h, border, format, type, pixels);
+}
+
+static void (*gl_DrawBuffers)(GLsizei, const GLenum *);
+
+static void t_DrawBuffers(GLsizei n, const GLenum *bufs)
+{
+    static _Atomic int cnt;
+    gl_DrawBuffers(n, bufs);
+    if (atomic_fetch_add(&cnt, 1) < 60) {
+        GLenum status = gl_CheckFramebufferStatus ? gl_CheckFramebufferStatus(0x8D40) : 0;
+        macho_log("gl", "glDrawBuffers(%d: %#x %#x %#x %#x) fb %u status %#x", n, n > 0 ? bufs[0] : 0,
+                  n > 1 ? bufs[1] : 0, n > 2 ? bufs[2] : 0, n > 3 ? bufs[3] : 0, t_current_fb, status);
+        gl_report("glDrawBuffers");
+    }
+}
+
 static void *trace_entry(const char *name, void *fn, void *(*resolve)(const char *))
 {
     static _Atomic int listed;
@@ -869,6 +902,7 @@ static void *trace_entry(const char *name, void *fn, void *(*resolve)(const char
     TRACE(RenderbufferStorage)
     TRACE(RenderbufferStorageMultisample)
     TRACE(CheckFramebufferStatus)
+    TRACE(DrawBuffers)
     TRACE(DrawElements)
     TRACE(DrawArrays)
     TRACE(DrawElementsInstanced)
@@ -889,6 +923,11 @@ void *gl_entry(const char *name, void *fn, void *(*resolve)(const char *))
     static int trace = -1;
     if (trace < 0)
         trace = getenv("HYPRISM_GL_TRACE") != NULL;
+    if (strcmp(name, "glTexImage2D") == 0) {
+        real_TexImage2D_rgb10 = (void (*)(GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum,
+                                          const void *))fn;
+        fn = (void *)fix_TexImage2D;
+    }
     if (trace)
         fn = trace_entry(name, fn, resolve);
     for (size_t i = 0; i < SHIM_COUNT(k_glsl_entries); i++)
