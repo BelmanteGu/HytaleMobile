@@ -217,6 +217,23 @@ static bool w_GL_SwapWindow(SDL_Window *window)
     return ok;
 }
 
+// The client runs with VSync off and an uncapped frame rate, so on a 60 Hz phone display it renders
+// 70 to 100 frames a second that are never shown. That only heats the SoC, which then throttles the
+// GPU (a measured 220 MHz out of 719) and makes the frame pacing worse. Present at the display's
+// rate instead. HYPRISM_VSYNC=0 restores the client's own setting.
+static bool w_GL_SetSwapInterval(int interval)
+{
+    REAL(SDL_GL_SetSwapInterval);
+    const char *env = getenv("HYPRISM_VSYNC");
+    if (!(env && env[0] == '0') && interval == 0) {
+        static int logged;
+        if (!logged++)
+            macho_log("sdl", "forcing VSync on (the client asked for an uncapped frame rate)");
+        interval = 1;
+    }
+    return real_SDL_GL_SetSwapInterval(interval);
+}
+
 void *sdl_scale_lookup(void *sdl_handle, const char *symbol)
 {
     if (!g_sdl) {
@@ -229,6 +246,8 @@ void *sdl_scale_lookup(void *sdl_handle, const char *symbol)
     }
     if (strcmp(symbol, "SDL_GL_GetProcAddress") == 0)
         return (void *)w_GL_GetProcAddress;
+    if (strcmp(symbol, "SDL_GL_SetSwapInterval") == 0)
+        return (void *)w_GL_SetSwapInterval;
     if (strcmp(symbol, "SDL_GL_SwapWindow") == 0 && getenv("HYPRISM_PERF"))
         return (void *)w_GL_SwapWindow;
     if (g_scale == 1.0f)

@@ -15,6 +15,7 @@ SPDX-License-Identifier: GPL-3.0-only
   <uses-permission android:name="android.permission.VIBRATE" />
 
   <application android:label="Hytale (Hyprism)"
+      android:appCategory="game"
       android:hardwareAccelerated="true"
       android:extractNativeLibs="true"
       android:debuggable="true"
