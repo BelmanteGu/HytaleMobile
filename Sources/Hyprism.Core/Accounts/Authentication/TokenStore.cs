@@ -68,13 +68,31 @@ internal static class TokenStore
     {
         try
         {
-            var json = JsonSerializer.Serialize(session, JsonDefaults.Indented);
-            File.WriteAllText(filePath, json);
+            Write(filePath, session);
         }
         catch (Exception ex)
         {
             Logger.Warning("TokenStore", $"Failed to save session to '{filePath}': {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Writes the session through a temporary file and a rename, so a process killed mid-write (Android
+    /// stops background apps without notice) leaves the previous session instead of a truncated file.
+    /// </summary>
+    /// <exception cref="IOException">The file could not be written.</exception>
+    public static void Write(string filePath, HytaleAuthSession session)
+    {
+        var json = JsonSerializer.Serialize(session, JsonDefaults.Indented);
+        var tempPath = filePath + ".tmp";
+        using (var stream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+        using (var writer = new StreamWriter(stream))
+        {
+            writer.Write(json);
+            writer.Flush();
+            stream.Flush(flushToDisk: true);
+        }
+        File.Move(tempPath, filePath, overwrite: true);
     }
 
     /// <summary>

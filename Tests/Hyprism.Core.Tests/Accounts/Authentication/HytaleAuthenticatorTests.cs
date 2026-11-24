@@ -273,6 +273,116 @@ public sealed class HytaleAuthenticatorTests
         throw new InvalidOperationException($"Query parameter '{name}' was not found");
     }
 
+    [Fact]
+    public async Task GetValidSessionAsync_KeepsTheSavedSessionWhenTheRefreshCannotReachTheServer()
+    {
+        await WithExpiredSessionAsync(
+            new TokenEndpointHandler(_ => throw new HttpRequestException("network is unreachable")),
+            async (auth, sessionPath, _) =>
+            {
+                Assert.Null(await auth.GetValidSessionAsync());
+
+                Assert.True(File.Exists(sessionPath));
+                Assert.NotNull(auth.CurrentSession);
+                Assert.Equal("old-refresh", auth.CurrentSession.RefreshToken);
+            });
+    }
+
+    [Fact]
+    public async Task GetValidSessionAsync_KeepsTheSavedSessionOnAServerError()
+    {
+        await WithExpiredSessionAsync(
+            new TokenEndpointHandler(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError)),
+            async (auth, sessionPath, _) =>
+            {
+                Assert.Null(await auth.GetValidSessionAsync());
+                Assert.True(File.Exists(sessionPath));
+            });
+    }
+
+    [Fact]
+    public async Task GetValidSessionAsync_LogsOutWhenTheServerRejectsTheRefreshToken()
+    {
+        await WithExpiredSessionAsync(
+            new TokenEndpointHandler(_ => new HttpResponseMessage(HttpStatusCode.BadRequest)
+            {
+                Content = new StringContent("""{"error":"invalid_grant"}""")
+            }),
+            async (auth, sessionPath, _) =>
+            {
+                Assert.Null(await auth.GetValidSessionAsync());
+                Assert.False(File.Exists(sessionPath));
+                Assert.Null(auth.CurrentSession);
+            });
+    }
+
+    [Fact]
+    public async Task GetValidSessionAsync_RefreshesOnceForConcurrentCallers()
+    {
+        var handler = new TokenEndpointHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{"access_token":"new-access","refresh_token":"new-refresh","expires_in":3600}""")
+        });
+        await WithExpiredSessionAsync(handler, async (auth, sessionPath, _) =>
+        {
+            var sessions = await Task.WhenAll(Enumerable.Range(0, 5).Select(_ => auth.GetValidSessionAsync()));
+
+            Assert.Equal(1, handler.Calls);
+            Assert.All(sessions, session => Assert.Equal("new-access", session?.AccessToken));
+            Assert.Contains("new-refresh", await File.ReadAllTextAsync(sessionPath), StringComparison.Ordinal);
+            Assert.False(File.Exists(sessionPath + ".tmp"));
+        });
+    }
+
+    private static async Task WithExpiredSessionAsync(
+        TokenEndpointHandler handler,
+        Func<HytaleAuthenticator, string, string, Task> test)
+    {
+        var appDir = Path.Combine(Path.GetTempPath(), $"hyprism-auth-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(appDir);
+        try
+        {
+            var sessionPath = Path.Combine(appDir, "HytaleSession.json");
+            await File.WriteAllTextAsync(sessionPath, JsonSerializer.Serialize(new HytaleAuthSession
+            {
+                AccessToken = "old-access",
+                RefreshToken = "old-refresh",
+                ExpiresAt = DateTime.UtcNow.AddHours(-1),
+                Username = "Player",
+                UUID = "550e8400-e29b-41d4-a716-446655440000",
+            }));
+            var config = new Mock<IConfigStore>();
+            config.SetupGet(service => service.Configuration).Returns(new Config());
+            using var httpClient = new HttpClient(handler);
+            var auth = new HytaleAuthenticator(httpClient, appDir, config.Object);
+            Assert.NotNull(auth.CurrentSession);
+
+            await test(auth, sessionPath, appDir);
+        }
+        finally
+        {
+            Directory.Delete(appDir, recursive: true);
+        }
+    }
+
+    /// <summary>Answers the OAuth token endpoint, slowly enough for concurrent callers to overlap.</summary>
+    private sealed class TokenEndpointHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
+    {
+        private int _calls;
+
+        public int Calls => _calls;
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            Assert.Equal("oauth.accounts.hytale.com", request.RequestUri?.Host);
+            Interlocked.Increment(ref _calls);
+            await Task.Delay(50, cancellationToken);
+            return respond(request);
+        }
+    }
+
     private sealed class SuccessfulOAuthHandler : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(

@@ -46,6 +46,19 @@ public class HytaleAuthenticator : IHytaleAuthenticator
     private TaskCompletionSource<string>? _authCodeTcs;
     private HttpListener? _callbackListener;
 
+    // The token server rotates refresh tokens and revokes the whole token family when a used one comes back,
+    // so two refreshes that start with the same token can end the session. Only one runs at a time.
+    private readonly SemaphoreSlim _refreshLock = new(1, 1);
+
+    private enum RefreshOutcome
+    {
+        Refreshed,
+        /// <summary>The server rejected the refresh token: the session is over and needs a new login.</summary>
+        Rejected,
+        /// <summary>No answer or a server error (offline, timeout, 5xx): the session is kept for a later try.</summary>
+        Failed,
+    }
+
     /// <summary>
     /// The current auth session, or null if not logged in
     /// </summary>
@@ -242,13 +255,30 @@ public class HytaleAuthenticator : IHytaleAuthenticator
 
         if (CurrentSession.ExpiresAt <= DateTime.UtcNow.AddMinutes(1))
         {
-            Logger.Info("HytaleAuth", "Access token expired, refreshing...");
-            var refreshed = await RefreshTokenAsync();
-            if (!refreshed)
+            await _refreshLock.WaitAsync();
+            try
             {
-                Logger.Warning("HytaleAuth", "Token refresh failed, session invalid");
-                Logout();
-                return null;
+                // Another caller may have refreshed while this one waited.
+                if (CurrentSession == null) return null;
+                if (CurrentSession.ExpiresAt <= DateTime.UtcNow.AddMinutes(1))
+                {
+                    Logger.Info("HytaleAuth", "Access token expired, refreshing...");
+                    switch (await RefreshTokenAsync())
+                    {
+                        case RefreshOutcome.Rejected:
+                            Logger.Warning("HytaleAuth", "The refresh token was rejected, a new login is needed");
+                            Logout();
+                            return null;
+                        case RefreshOutcome.Failed:
+                            // Offline or a server error: keep the saved session so the next try can refresh it.
+                            Logger.Warning("HytaleAuth", "Token refresh failed, keeping the session for a later try");
+                            return null;
+                    }
+                }
+            }
+            finally
+            {
+                _refreshLock.Release();
             }
         }
 
@@ -265,8 +295,17 @@ public class HytaleAuthenticator : IHytaleAuthenticator
         if (CurrentSession == null) return false;
 
         Logger.Info("HytaleAuth", "Forcing token refresh...");
-        var refreshed = await RefreshTokenAsync();
-        if (!refreshed)
+        RefreshOutcome outcome;
+        await _refreshLock.WaitAsync();
+        try
+        {
+            outcome = await RefreshTokenAsync();
+        }
+        finally
+        {
+            _refreshLock.Release();
+        }
+        if (outcome != RefreshOutcome.Refreshed)
         {
             Logger.Warning("HytaleAuth", "Forced token refresh failed");
             return false;
@@ -438,45 +477,15 @@ public class HytaleAuthenticator : IHytaleAuthenticator
         }
     }
 
-    private async Task<bool> RefreshTokenAsync()
+    /// <summary>Refreshes <see cref="CurrentSession"/>. The caller holds <see cref="_refreshLock"/>.</summary>
+    private async Task<RefreshOutcome> RefreshTokenAsync()
     {
-        if (CurrentSession?.RefreshToken == null) return false;
+        if (CurrentSession == null || string.IsNullOrEmpty(CurrentSession.RefreshToken)) return RefreshOutcome.Rejected;
 
-        using var content = new FormUrlEncodedContent(new Dictionary<string, string>
-        {
-            ["grant_type"] = "refresh_token",
-            ["refresh_token"] = CurrentSession.RefreshToken,
-            ["client_id"] = ClientId
-        });
-
-        try
-        {
-            using var response = await _httpClient.PostAsync(TokenUrl, content);
-            var json = await response.Content.ReadAsStringAsync();
-
-            if (!response.IsSuccessStatusCode)
-            {
-                Logger.Error("HytaleAuth", $"Token refresh failed ({response.StatusCode}): {json}");
-                return false;
-            }
-
-            var tokenResp = JsonSerializer.Deserialize<TokenResponse>(json);
-            if (tokenResp == null) return false;
-
-            CurrentSession.AccessToken = tokenResp.AccessToken;
-            if (!string.IsNullOrEmpty(tokenResp.RefreshToken))
-                CurrentSession.RefreshToken = tokenResp.RefreshToken;
-            CurrentSession.ExpiresAt = DateTime.UtcNow.AddSeconds(tokenResp.ExpiresIn);
-
+        var outcome = await RefreshTokenForSessionAsync(CurrentSession, CancellationToken.None);
+        if (outcome == RefreshOutcome.Refreshed)
             SaveSession();
-            Logger.Info("HytaleAuth", "Token refreshed successfully");
-            return true;
-        }
-        catch (Exception ex)
-        {
-            Logger.Error("HytaleAuth", $"Token refresh exception: {ex.Message}");
-            return false;
-        }
+        return outcome;
     }
 
     private async Task<List<HytaleProfile>> FetchProfileAsync(string accessToken)
@@ -724,15 +733,23 @@ public class HytaleAuthenticator : IHytaleAuthenticator
             var profileDir = LauncherUtilities.GetProfileFolderPath(_appDir, profile, createIfMissing: false, migrateLegacyByName: true);
             var sessionPath = TokenStore.GetSessionFilePath(profileDir, _appDir);
 
+            // The active profile's session is the one GetValidSessionAsync just tried; refreshing a second copy
+            // of it here would reuse a refresh token the server may already have rotated.
+            if (CurrentSession != null &&
+                string.Equals(Path.GetFullPath(sessionPath), Path.GetFullPath(GetSessionFilePath()), StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             if (!File.Exists(sessionPath))
             {
                 continue;
             }
 
+            await _refreshLock.WaitAsync(cancellationToken);
             try
             {
-                var json = await File.ReadAllTextAsync(sessionPath, cancellationToken);
-                var session = JsonSerializer.Deserialize<HytaleAuthSession>(json, JsonDefaults.CaseInsensitive);
+                var session = TokenStore.Load(sessionPath);
                 if (session == null || string.IsNullOrEmpty(session.RefreshToken))
                 {
                     continue;
@@ -741,15 +758,13 @@ public class HytaleAuthenticator : IHytaleAuthenticator
                 if (session.ExpiresAt <= DateTime.UtcNow.AddMinutes(1))
                 {
                     Logger.Info("HytaleAuth", $"Refreshing token for official profile '{profile.Name}'...");
-                    var refreshed = await RefreshTokenForSessionAsync(session, cancellationToken);
-                    if (!refreshed)
+                    if (await RefreshTokenForSessionAsync(session, cancellationToken) != RefreshOutcome.Refreshed)
                     {
                         Logger.Warning("HytaleAuth", $"Failed to refresh token for profile '{profile.Name}'");
                         continue;
                     }
 
-                    var updatedJson = JsonSerializer.Serialize(session, JsonDefaults.Indented);
-                    await File.WriteAllTextAsync(sessionPath, updatedJson, cancellationToken);
+                    TokenStore.Save(sessionPath, session);
                 }
 
                 Logger.Info("HytaleAuth", $"Using official profile '{profile.Name}' for API access");
@@ -763,6 +778,10 @@ public class HytaleAuthenticator : IHytaleAuthenticator
             {
                 Logger.Warning("HytaleAuth", $"Failed to load session for profile '{profile.Name}': {ex.Message}");
             }
+            finally
+            {
+                _refreshLock.Release();
+            }
         }
 
         Logger.Warning("HytaleAuth", "No valid official session found in any profile");
@@ -772,11 +791,11 @@ public class HytaleAuthenticator : IHytaleAuthenticator
     /// <summary>
     /// Refreshes token for a specific session (not necessarily the current one)
     /// </summary>
-    private async Task<bool> RefreshTokenForSessionAsync(
+    private async Task<RefreshOutcome> RefreshTokenForSessionAsync(
         HytaleAuthSession session,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(session.RefreshToken)) return false;
+        if (string.IsNullOrEmpty(session.RefreshToken)) return RefreshOutcome.Rejected;
 
         using var content = new FormUrlEncodedContent(new Dictionary<string, string>
         {
@@ -793,19 +812,22 @@ public class HytaleAuthenticator : IHytaleAuthenticator
             if (!response.IsSuccessStatusCode)
             {
                 Logger.Error("HytaleAuth", $"Token refresh failed ({response.StatusCode}): {json}");
-                return false;
+                // OAuth answers 400 (invalid_grant) or 401 for a refresh token it no longer accepts.
+                return response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized
+                    ? RefreshOutcome.Rejected
+                    : RefreshOutcome.Failed;
             }
 
             var tokenResp = JsonSerializer.Deserialize<TokenResponse>(json);
-            if (tokenResp == null) return false;
+            if (tokenResp == null || string.IsNullOrEmpty(tokenResp.AccessToken)) return RefreshOutcome.Failed;
 
             session.AccessToken = tokenResp.AccessToken;
             if (!string.IsNullOrEmpty(tokenResp.RefreshToken))
                 session.RefreshToken = tokenResp.RefreshToken;
             session.ExpiresAt = DateTime.UtcNow.AddSeconds(tokenResp.ExpiresIn);
 
-            Logger.Info("HytaleAuth", "Token refreshed successfully for session");
-            return true;
+            Logger.Info("HytaleAuth", "Token refreshed successfully");
+            return RefreshOutcome.Refreshed;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -814,7 +836,7 @@ public class HytaleAuthenticator : IHytaleAuthenticator
         catch (Exception ex)
         {
             Logger.Error("HytaleAuth", $"Token refresh exception: {ex.Message}");
-            return false;
+            return RefreshOutcome.Failed;
         }
     }
 
@@ -859,8 +881,7 @@ public class HytaleAuthenticator : IHytaleAuthenticator
             var profileDir = LauncherUtilities.GetProfileFolderPath(_appDir, profile, createIfMissing: true);
             var sessionPath = TokenStore.GetSessionFilePath(profileDir, _appDir);
 
-            var json = JsonSerializer.Serialize(CurrentSession, JsonDefaults.Indented);
-            File.WriteAllText(sessionPath, json);
+            TokenStore.Write(sessionPath, CurrentSession);
 
             Logger.Success("HytaleAuth", $"Saved Hytale session to profile '{profile.Name}'");
             return true;

@@ -185,6 +185,13 @@ public static class Logger
             {
                 var timestamp = DateTime.Now.ToString("HH:mm:ss");
 
+                // Android has no console colours (setting one throws), so its line is written plain.
+                if (OperatingSystem.IsAndroid() || OperatingSystem.IsIOS())
+                {
+                    _originalOut.WriteLine($"{timestamp} {level} {category}: {message}");
+                    return;
+                }
+
                 _originalOut.Write($"{timestamp} ");
 
                 var originalColor = Console.ForegroundColor;

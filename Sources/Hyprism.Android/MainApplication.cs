@@ -25,6 +25,9 @@ public sealed class MainApplication : AvaloniaAndroidApplication<App>
             global::Android.Util.Log.Error("Hyprism", $"Unhandled exception: {args.Exception}");
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
             global::Android.Util.Log.Error("Hyprism", $"Unhandled exception: {args.ExceptionObject}");
+        // The launcher log goes to Console.Out, which Android drops; send it to logcat (tag Hyprism) so a
+        // failed login or token refresh can be read with adb logcat -s Hyprism. LauncherStartup captures it.
+        Console.SetOut(new LogcatWriter());
         AndroidGameHost.EnsureHostInstance();
         LauncherStartup.Initialize(services =>
         {
@@ -32,6 +35,46 @@ public sealed class MainApplication : AvaloniaAndroidApplication<App>
             services.AddSingleton<IExternalGameHost, AndroidGameHost>();
         });
         return base.CustomizeAppBuilder(builder);
+    }
+}
+
+/// <summary>
+/// A console that writes each line to logcat.
+/// </summary>
+internal sealed class LogcatWriter : System.IO.TextWriter
+{
+    private readonly System.Text.StringBuilder _line = new();
+
+    public override System.Text.Encoding Encoding => System.Text.Encoding.UTF8;
+
+    public override void Write(char value)
+    {
+        lock (_line)
+            Append(value);
+    }
+
+    public override void Write(string? value)
+    {
+        if (value == null)
+            return;
+        lock (_line)
+        {
+            foreach (var c in value)
+                Append(c);
+        }
+    }
+
+    private void Append(char c)
+    {
+        if (c == '\n')
+        {
+            global::Android.Util.Log.Info("Hyprism", _line.ToString());
+            _line.Clear();
+        }
+        else if (c != '\r')
+        {
+            _line.Append(c);
+        }
     }
 }
 
