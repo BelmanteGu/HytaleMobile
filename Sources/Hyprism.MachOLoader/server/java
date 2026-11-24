@@ -2,19 +2,108 @@
 # Copyright (C) 2026 Hyprism Launcher
 # SPDX-License-Identifier: GPL-3.0-only
 #
-# Starts the local world server with the bundled JDK. Android's app seccomp
-# filter kills the process on get_mempolicy, which Shenandoah calls, so the
-# client's Shenandoah options are replaced with G1.
-J=/data/user/0/org.hyprism.game/files/jdk
+# Starts the local world server with the bundled JDK, tuned for a phone.
+#
+# The client launches the server with desktop settings: Shenandoah, -Xms768M and no heap limit, so
+# the JVM may grow to a quarter of the phone's RAM and keeps what it took. Measured with the build 34
+# server (Temurin 26, G1, fresh universe): 3208 MB committed with the client's settings, 656 MB with
+# the ones below, and 27% less CPU to boot.
+#
+#   - Shenandoah is replaced with G1: Android's app seccomp filter kills the process on
+#     get_mempolicy, which Shenandoah calls.
+#   - Heap from 256 MB up to HYPRISM_SERVER_HEAP (default 1536M, a ceiling against running out in a
+#     big world; the server's live data after boot is about 260 MB). G1 hands free memory back to
+#     Android: a periodic collection when idle and at most 30% of the heap left free. On an Android
+#     emulator the server's RSS after boot went from 1161-1173 MB to 689-728 MB.
+#   - Two GC threads and two JIT compiler threads, so the server does not wake every core at once.
+#   - The server stays off the fastest core(s) (cpu_capacity), which the client's render thread
+#     needs, and runs at a lower priority than the game. HYPRISM_SERVER_CORES=all turns that off,
+#     a hex mask picks the cores.
+#   - An AOT cache (JDK 25, JEP 483) of the server's classes, made on the phone: the first run
+#     records which classes load, the next one builds the cache in the background, later runs use
+#     it (15% less CPU and 1.5 s less to boot, measured). HYPRISM_SERVER_AOT=0 turns it off.
+#   - HYPRISM_SERVER_OPTS adds JVM options (they win over the ones above).
+umask 077
+H=${HYPRISM_HOME:-/data/user/0/org.hyprism.game}
+J=${HYPRISM_JDK:-$H/files/jdk}
+A=$H/files/aot
+CPUS=${HYPRISM_SYSFS_CPU:-/sys/devices/system/cpu}
+
+jar=
+prev=
 n=$#
 i=0
 while [ "$i" -lt "$n" ]; do
     a=$1
     shift
     case "$a" in
-        -XX:+UseShenandoahGC|-XX:Shenandoah*) ;;
+        -XX:+UseShenandoahGC|-XX:Shenandoah*|-Xms*|-Xmx*|-XX:AOTCache=*|-XX:AOTMode=*) ;;
         *) set -- "$@" "$a" ;;
     esac
+    [ "$prev" = -jar ] && jar=$a
+    prev=$a
     i=$((i + 1))
 done
-exec "$J/bin/java" -XX:+UseG1GC "$@"
+
+opts="-XX:+UseG1GC -Xms256M -Xmx${HYPRISM_SERVER_HEAP:-1536M} -XX:G1PeriodicGCInterval=30000"
+opts="$opts -XX:MinHeapFreeRatio=10 -XX:MaxHeapFreeRatio=30 -XX:ParallelGCThreads=2 -XX:ConcGCThreads=1"
+opts="$opts -XX:CICompilerCount=2 -XX:ReservedCodeCacheSize=96m"
+
+# AOT cache. Every file carries the jar and JVM it was made for, so a game update starts over.
+if [ "${HYPRISM_SERVER_AOT:-1}" != 0 ] && [ -n "$jar" ] && [ -f "$jar" ] && mkdir -p "$A" 2>/dev/null; then
+    stamp="$(ls -ln "$jar" "$J/lib/server/libjvm.so" 2>/dev/null | awk '{print $5, $6, $7, $8}' | tr '\n' ' ')"
+    aot="-XX:+UseCompactObjectHeaders -XX:-AOTClassLinking"
+    if [ -s "$A/server.aot" ] && [ "$(cat "$A/server.aot.stamp" 2>/dev/null)" = "$stamp" ]; then
+        opts="$opts $aot -XX:AOTCache=$A/server.aot"
+    elif [ "$(cat "$A/failed.stamp" 2>/dev/null)" = "$stamp" ]; then
+        :
+    elif [ -s "$A/server.aotconf" ] && [ "$(cat "$A/server.aotconf.stamp" 2>/dev/null)" = "$stamp" ]; then
+        # Build the cache from the recorded configuration, at the lowest priority, while this run
+        # starts without one. A build cut short leaves only the .tmp file and is tried again later.
+        if ! [ -f "$A/server.aot.tmp" ] || [ -n "$(find "$A/server.aot.tmp" -mmin +10 2>/dev/null)" ]; then
+            (
+                rm -f "$A/server.aot.tmp"
+                if nice -n 19 "$J/bin/java" -Xmx1024M $aot -XX:AOTMode=create \
+                        -XX:AOTConfiguration="$A/server.aotconf" -XX:AOTCache="$A/server.aot.tmp" \
+                        -jar "$jar" > "$A/create.log" 2>&1 && [ -s "$A/server.aot.tmp" ]; then
+                    mv "$A/server.aot.tmp" "$A/server.aot" && echo "$stamp" > "$A/server.aot.stamp"
+                    rm -f "$A/server.aotconf"
+                else
+                    rm -f "$A/server.aot.tmp" "$A/server.aotconf"
+                    echo "$stamp" > "$A/failed.stamp"
+                fi
+            ) < /dev/null > /dev/null 2>&1 &
+        fi
+    else
+        # Record this run; the JVM writes the configuration when the server shuts down normally.
+        rm -f "$A/server.aot" "$A/server.aot.stamp" "$A/server.aotconf"
+        echo "$stamp" > "$A/server.aotconf.stamp"
+        opts="$opts $aot -XX:AOTMode=record -XX:AOTConfiguration=$A/server.aotconf"
+    fi
+fi
+opts="$opts ${HYPRISM_SERVER_OPTS:-}"
+
+# Keep the server off the fastest cores and below the game's priority.
+run=
+if [ "${HYPRISM_SERVER_CORES:-auto}" != all ] && command -v taskset > /dev/null 2>&1; then
+    mask=${HYPRISM_SERVER_CORES:-auto}
+    if [ "$mask" = auto ]; then
+        max=0
+        for c in "$CPUS"/cpu[0-9]*; do
+            cap=$(cat "$c/cpu_capacity" 2>/dev/null || echo 0)
+            [ "$cap" -gt "$max" ] && max=$cap
+        done
+        m=0
+        for c in "$CPUS"/cpu[0-9]*; do
+            cap=$(cat "$c/cpu_capacity" 2>/dev/null || echo 0)
+            [ "$cap" -gt 0 ] && [ "$cap" -lt "$max" ] && m=$((m | (1 << ${c##*cpu})))
+        done
+        mask=
+        [ "$m" -gt 0 ] && mask=$(printf '%x' "$m")
+    fi
+    [ -n "$mask" ] && run="taskset $mask"
+fi
+command -v nice > /dev/null 2>&1 && run="$run nice -n 3"
+
+# shellcheck disable=SC2086 # $run and $opts are word lists without spaces in their words
+exec $run "$J/bin/java" $opts "$@"

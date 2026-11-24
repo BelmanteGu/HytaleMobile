@@ -24,7 +24,10 @@ javac --release 11 -nowarn -classpath "$jar" -d "$work/classes" \
 "$tools/d8" --release --lib "$jar" --min-api 30 --output "$work/dex" $(find "$work/classes" -name '*.class')
 # Target SDK 28: newer targets forbid executing files from the app's data
 # directory, and the client starts the local world server as a Java process.
-"$tools/aapt2" link -o "$work/base.apk" -I "$jar" --manifest "$here/AndroidManifest.xml" \
+# assets/java is the world server launcher; HytaleActivity copies it to files/java.
+mkdir -p "$work/assets"
+cp "$root/server/java" "$work/assets/java"
+"$tools/aapt2" link -o "$work/base.apk" -I "$jar" --manifest "$here/AndroidManifest.xml" -A "$work/assets" \
     --min-sdk-version 28 --target-sdk-version 28
 
 cp "$work/dex/classes.dex" "$work/stage/"

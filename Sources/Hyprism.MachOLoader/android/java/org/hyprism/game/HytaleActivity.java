@@ -15,8 +15,13 @@ import android.widget.Toast;
 import org.libsdl.app.SDLActivity;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.util.Arrays;
 
 /**
  * Hosts the macOS Hytale client, loaded natively by libmain.so. The Hyprism
@@ -33,6 +38,7 @@ public class HytaleActivity extends SDLActivity {
             WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
         getWindow().setDecorFitsSystemWindows(false);
         tunePerformance();
+        installServerLauncher();
 
         // On-screen gamepad over the game; the saved on/off state is restored
         // once the client has had time to initialise SDL.
@@ -83,6 +89,31 @@ public class HytaleActivity extends SDLActivity {
                 Toast.makeText(this, "The phone is hot and slowing down. Let it cool for a moment.",
                     Toast.LENGTH_SHORT).show();
         });
+    }
+
+    /**
+     * Writes the world server launcher (server/java, shipped in the APK's assets) to files/java,
+     * where args.txt points the client, so a new APK brings its JVM settings without reinstalling
+     * the server runtime. It runs before the client starts and only rewrites a changed file.
+     */
+    private void installServerLauncher() {
+        File target = new File(getFilesDir(), "java");
+        try (InputStream in = getAssets().open("java")) {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            byte[] buffer = new byte[8192];
+            for (int n; (n = in.read(buffer)) > 0; )
+                bytes.write(buffer, 0, n);
+            byte[] wanted = bytes.toByteArray();
+            if (target.isFile() && Arrays.equals(Files.readAllBytes(target.toPath()), wanted))
+                return;
+            File tmp = new File(getFilesDir(), "java.tmp");
+            Files.write(tmp.toPath(), wanted);
+            if (!tmp.setExecutable(true, true) || !tmp.renameTo(target))
+                throw new IOException("could not replace " + target);
+            Log.i("HytaleHost", "installed the world server launcher");
+        } catch (IOException e) {
+            Log.w("HytaleHost", "world server launcher not updated: " + e);
+        }
     }
 
     /** Reads NAME=value from the same env.txt the native loader reads, or null when it is absent. */
