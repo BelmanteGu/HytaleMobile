@@ -11,13 +11,19 @@
 #
 #   - Shenandoah is replaced with G1: Android's app seccomp filter kills the process on
 #     get_mempolicy, which Shenandoah calls.
-#   - Heap from 256 MB up to HYPRISM_SERVER_HEAP (default 1536M, a ceiling against running out in a
-#     big world; the server's live data after boot is about 260 MB). G1 hands free memory back to
-#     Android with a periodic collection when idle. Keeping the heap tighter still
-#     (MaxHeapFreeRatio=30) saved memory on an idle server but, with a player in the world on the S23,
-#     left G1's concurrent marking running non-stop (74% of a core), so it is not used. The GC log is
-#     in files/server-gc.log.
-#   - Two GC threads and two JIT compiler threads, so the server does not wake every core at once.
+#   - Heap from 512 MB up to HYPRISM_SERVER_HEAP (default 1536M, a ceiling against running out in a
+#     big world; the server's live data after boot is about 300 MB). With a player in the world on the
+#     S23, G1's concurrent marking ran non-stop (74% of a core) under a tight heap
+#     (MaxHeapFreeRatio=30), periodic collections and the adaptive marking threshold, and the GC log
+#     showed extra cycles for metaspace and code cache growth. So: no periodic GC, marking starts at a
+#     fixed 70% occupancy, and metaspace and code cache start large enough. The GC log is in
+#     files/server-gc.log.
+#   - Two GC threads, two JIT compiler threads and three common-pool workers, so the server does not
+#     wake every core at once.
+#   - The world ticks at HYPRISM_SERVER_TPS (default 20, the desktop server runs 30; systems scale by
+#     the tick's delta time), and the tick loop sleeps instead of spinning: the server busy-waits the
+#     last 3 ms of every tick ("sleep offset"), about a tenth of a core for the world thread alone.
+#     The asset file watcher is off; a singleplayer world does not reload assets.
 #   - The server stays off the fastest core(s) (cpu_capacity), which the client's render thread
 #     needs, and runs at a lower priority than the game. HYPRISM_SERVER_CORES=all turns that off,
 #     a hex mask picks the cores.
@@ -47,9 +53,11 @@ while [ "$i" -lt "$n" ]; do
     i=$((i + 1))
 done
 
-opts="-XX:+UseG1GC -Xms256M -Xmx${HYPRISM_SERVER_HEAP:-1536M} -XX:G1PeriodicGCInterval=30000"
-opts="$opts -XX:ParallelGCThreads=2 -XX:ConcGCThreads=1"
-opts="$opts -XX:CICompilerCount=2 -XX:ReservedCodeCacheSize=96m"
+opts="-XX:+UseG1GC -Xms512M -Xmx${HYPRISM_SERVER_HEAP:-1536M}"
+opts="$opts -XX:-G1UseAdaptiveIHOP -XX:InitiatingHeapOccupancyPercent=70 -XX:G1ReservePercent=10"
+opts="$opts -XX:ParallelGCThreads=2 -XX:ConcGCThreads=1 -XX:MetaspaceSize=192m"
+opts="$opts -XX:CICompilerCount=2 -XX:ReservedCodeCacheSize=128m"
+opts="$opts -Djava.util.concurrent.ForkJoinPool.common.parallelism=3"
 # The last two runs' GC log, to tell a busy world from a heap that is too small.
 opts="$opts -Xlog:gc*:file=$H/files/server-gc.log:time,uptime:filecount=2,filesize=4m"
 
@@ -110,4 +118,5 @@ fi
 command -v nice > /dev/null 2>&1 && run="$run nice -n 3"
 
 # shellcheck disable=SC2086 # $run and $opts are word lists without spaces in their words
-exec $run "$J/bin/java" $opts "$@"
+exec $run "$J/bin/java" $opts "$@" --disable-file-watcher \
+    --boot-command "sleep offset --offset=0" --boot-command "world tps ${HYPRISM_SERVER_TPS:-20}"
