@@ -45,32 +45,42 @@ public class GamepadOverlay extends View {
 
     /**
      * A square control: an action icon (assets/icons, Lucide) with the controller label in its corner.
-     * button >= 0 is a gamepad button; axis >= 0 is a trigger.
+     * button >= 0 is a gamepad button; axis >= 0 is a trigger; a chord holds RIGHT_SHOULDER and then
+     * presses its button, which is how Hytale's controller bindings reach the abilities.
      */
     static final class Control {
         final String label, icon;
         final float fx, fy, side; // centre (fx of the width, fy of the height) and side (of the height)
         final int button, axis;
+        final boolean chord;
         Bitmap bitmap;
         boolean down;
 
         Control(String label, String icon, float fx, float fy, float side, int button, int axis) {
+            this(label, icon, fx, fy, side, button, axis, false);
+        }
+
+        Control(String label, String icon, float fx, float fy, float side, int button, int axis, boolean chord) {
             this.label = label; this.icon = icon; this.fx = fx; this.fy = fy; this.side = side;
-            this.button = button; this.axis = axis;
+            this.button = button; this.axis = axis; this.chord = chord;
         }
     }
 
-    // What each button does is Hytale's own gamepad binding; the icons show the expected action.
+    // Hytale's default controller bindings (Settings > Controls, build 34): A jump, R3 crouch/slide/roll,
+    // L3 sprint, RT primary action, LT secondary action, X interact, RB + Y/X/B/A abilities 1-4,
+    // D-pad left emotes, right utility item, down drop item, B back in menus.
     private final Control[] controls = {
         new Control("A", "a", 0.890f, 0.80f, 0.185f, SOUTH, -1),
-        new Control("B", "b", 0.955f, 0.62f, 0.150f, EAST, -1),
+        new Control("R3", "r3", 0.955f, 0.62f, 0.150f, RIGHT_STICK, -1),
         new Control("X", "x", 0.825f, 0.62f, 0.150f, WEST, -1),
         new Control("Y", "y", 0.890f, 0.44f, 0.140f, NORTH, -1),
         new Control("RT", "rt", 0.955f, 0.29f, 0.170f, -1, RIGHT_TRIGGER),
         new Control("LT", "lt", 0.810f, 0.29f, 0.150f, -1, LEFT_TRIGGER),
         new Control("RB", "rb", 0.955f, 0.11f, 0.120f, RIGHT_SHOULDER, -1),
         new Control("LB", "lb", 0.825f, 0.11f, 0.120f, LEFT_SHOULDER, -1),
-        new Control("R3", "r3", 0.730f, 0.84f, 0.120f, RIGHT_STICK, -1),
+        new Control("RB+Y", "ab1", 0.700f, 0.11f, 0.110f, NORTH, -1, true),
+        new Control("RB+X", "ab2", 0.700f, 0.29f, 0.110f, WEST, -1, true),
+        new Control("B", "b", 0.730f, 0.84f, 0.120f, EAST, -1),
         new Control("L3", "l3", 0.270f, 0.80f, 0.120f, LEFT_STICK, -1),
         new Control("", "start", 0.600f, 0.07f, 0.090f, START, -1),
         new Control("", "back", 0.530f, 0.07f, 0.090f, BACK, -1),
@@ -221,10 +231,20 @@ public class GamepadOverlay extends View {
 
     private void press(Control c, boolean down) {
         c.down = down;
-        if (c.axis >= 0)
+        if (c.axis >= 0) {
             nativeAxis(c.axis, down ? AXIS_MAX : AXIS_MIN);
-        else
+        } else if (c.chord) {
+            // Hold the modifier first and let the game see it for a couple of frames.
+            if (down) {
+                nativeButton(RIGHT_SHOULDER, true);
+                handler.postDelayed(() -> { if (c.down) nativeButton(c.button, true); }, 40);
+            } else {
+                nativeButton(c.button, false);
+                handler.postDelayed(() -> nativeButton(RIGHT_SHOULDER, false), 40);
+            }
+        } else {
             nativeButton(c.button, down);
+        }
     }
 
     private void release(int role, boolean onToggle) {
