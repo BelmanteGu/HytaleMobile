@@ -136,6 +136,10 @@ public class HytaleAuthenticator : IHytaleAuthenticator
             callbackTask = ListenForCallbackAsync(listener, cancellationToken);
 
             Logger.Info("HytaleAuth", "Requesting presentation of the Hytale authorization page");
+            // The page can be finished in a browser on another machine when its 127.0.0.1 port reaches this
+            // listener (on Android: adb forward tcp:PORT tcp:PORT), for a browser that fails the site's bot check.
+            // The URL carries no secret: the code it returns is useless without this process's PKCE verifier.
+            Logger.Info("HytaleAuth", $"Callback port {port}, authorization page: {authUrl}");
             var authorizationUri = new Uri(authUrl, UriKind.Absolute);
             if (!await authorizationUriPresenter(authorizationUri, cancellationToken))
             {
@@ -446,35 +450,68 @@ public class HytaleAuthenticator : IHytaleAuthenticator
         _callbackListener = null;
     }
 
+    /// <summary>How long a code exchange keeps retrying when the token server cannot be reached.</summary>
+    public static TimeSpan ExchangeRetryWindow { get; set; } = TimeSpan.FromMinutes(3);
+
+    /// <summary>The pause between those retries.</summary>
+    public static TimeSpan ExchangeRetryDelay { get; set; } = TimeSpan.FromSeconds(3);
+
     private async Task<TokenResponse?> ExchangeCodeForTokensAsync(string code)
     {
-        using var content = new FormUrlEncodedContent(new Dictionary<string, string>
+        // The callback arrives while the browser is in front. Android 15+ cuts the network of an app in the
+        // background, so the first exchange can fail without reaching the server; the code stays valid for a
+        // few minutes, so keep trying until the launcher is back in front or the window ends.
+        var deadline = DateTime.UtcNow + ExchangeRetryWindow;
+        for (var attempt = 1; ; attempt++)
         {
-            ["grant_type"] = "authorization_code",
-            ["code"] = code,
-            ["redirect_uri"] = RedirectUri,
-            ["client_id"] = ClientId,
-            ["code_verifier"] = _pendingCodeVerifier ?? ""
-        });
-
-        try
-        {
-            using var response = await _httpClient.PostAsync(TokenUrl, content);
-            var json = await response.Content.ReadAsStringAsync();
-
-            if (!response.IsSuccessStatusCode)
+            using var content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
-                Logger.Error("HytaleAuth", $"Token exchange failed ({response.StatusCode}): {json}");
+                ["grant_type"] = "authorization_code",
+                ["code"] = code,
+                ["redirect_uri"] = RedirectUri,
+                ["client_id"] = ClientId,
+                ["code_verifier"] = _pendingCodeVerifier ?? ""
+            });
+
+            try
+            {
+                using var response = await _httpClient.PostAsync(TokenUrl, content);
+                var json = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    Logger.Error("HytaleAuth", $"Token exchange failed ({response.StatusCode}): {json}");
+                    return null;
+                }
+
+                if (attempt > 1)
+                    Logger.Info("HytaleAuth", $"Token exchange succeeded on attempt {attempt}");
+                return JsonSerializer.Deserialize<TokenResponse>(json);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException
+                                       && DateTime.UtcNow + ExchangeRetryDelay < deadline)
+            {
+                if (attempt == 1)
+                    Logger.Warning("HytaleAuth",
+                        $"Token server unreachable ({DescribeException(ex)}); retrying for {ExchangeRetryWindow.TotalMinutes:0} min. " +
+                        "Return to the launcher if the phone keeps it offline in the background");
+                await Task.Delay(ExchangeRetryDelay);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("HytaleAuth", $"Token exchange exception: {DescribeException(ex)}");
                 return null;
             }
+        }
+    }
 
-            return JsonSerializer.Deserialize<TokenResponse>(json);
-        }
-        catch (Exception ex)
-        {
-            Logger.Error("HytaleAuth", $"Token exchange exception: {ex.Message}");
-            return null;
-        }
+    /// <summary>The exception chain as "Type: message ← Type: message", which HttpClient wraps several levels deep.</summary>
+    private static string DescribeException(Exception ex)
+    {
+        var parts = new List<string>();
+        for (var e = ex; e != null; e = e.InnerException)
+            parts.Add($"{e.GetType().Name}: {e.Message}");
+        return string.Join(" <- ", parts);
     }
 
     /// <summary>Refreshes <see cref="CurrentSession"/>. The caller holds <see cref="_refreshLock"/>.</summary>

@@ -236,6 +236,66 @@ public sealed class HytaleAuthenticatorTests
     }
 
     [Fact]
+    public async Task LoginAsync_RetriesTheCodeExchangeWhileTheTokenServerIsUnreachable()
+    {
+        var appDir = Path.Combine(Path.GetTempPath(), $"hyprism-auth-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(appDir);
+        var (window, delay) = (HytaleAuthenticator.ExchangeRetryWindow, HytaleAuthenticator.ExchangeRetryDelay);
+        HytaleAuthenticator.ExchangeRetryWindow = TimeSpan.FromSeconds(10);
+        HytaleAuthenticator.ExchangeRetryDelay = TimeSpan.FromMilliseconds(20);
+
+        try
+        {
+            var config = new Mock<IConfigStore>();
+            config.SetupGet(service => service.Configuration).Returns(new Config());
+            // Android cuts a background app's network: the first two exchanges never reach the server.
+            var handler = new OfflineFirstHandler(failures: 2);
+            using var httpClient = new HttpClient(handler);
+            var auth = new HytaleAuthenticator(httpClient, appDir, config.Object);
+            using var callbackClient = new HttpClient();
+            Task<string>? callbackTask = null;
+
+            var session = await auth.LoginAsync((uri, _) =>
+            {
+                var state = GetQueryValue(uri, "state");
+                using var stateDocument = JsonDocument.Parse(Convert.FromBase64String(state));
+                var port = stateDocument.RootElement.GetProperty("port").GetString();
+                var callbackState = stateDocument.RootElement.GetProperty("state").GetString();
+                callbackTask = callbackClient.GetStringAsync(
+                    $"http://127.0.0.1:{port}/authorization-callback" +
+                    $"?code=test-code&state={Uri.EscapeDataString(callbackState!)}");
+                return Task.FromResult(true);
+            });
+
+            Assert.NotNull(session);
+            Assert.Equal("access-token", session.AccessToken);
+            Assert.Equal(3, handler.TokenCalls);
+        }
+        finally
+        {
+            (HytaleAuthenticator.ExchangeRetryWindow, HytaleAuthenticator.ExchangeRetryDelay) = (window, delay);
+            Directory.Delete(appDir, recursive: true);
+        }
+    }
+
+    private sealed class OfflineFirstHandler(int failures) : HttpMessageHandler
+    {
+        private readonly SuccessfulOAuthHandlerInvoker _online = new();
+        private int _tokenCalls;
+
+        public int TokenCalls => _tokenCalls;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.RequestUri?.Host == "oauth.accounts.hytale.com" && Interlocked.Increment(ref _tokenCalls) <= failures)
+                throw new HttpRequestException("Connection failure");
+            return _online.SendAsync(request, cancellationToken);
+        }
+    }
+
+    private sealed class SuccessfulOAuthHandlerInvoker() : HttpMessageInvoker(new SuccessfulOAuthHandler());
+
+    [Fact]
     public async Task LoginAsync_RejectsMissingHostCallback()
     {
         var appDir = Path.Combine(Path.GetTempPath(), $"hyprism-auth-{Guid.NewGuid():N}");
