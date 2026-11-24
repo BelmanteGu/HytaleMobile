@@ -27,6 +27,9 @@ javac --release 11 -nowarn -classpath "$jar" -d "$work/classes" \
 # assets/java is the world server launcher; HytaleActivity copies it to files/java.
 mkdir -p "$work/assets"
 cp "$root/server/java" "$work/assets/java"
+# assets/icons: the on-screen gamepad icons (Lucide, ISC).
+cp -R "$here/assets/icons" "$work/assets/icons"
+rm -f "$work/assets/icons/README.md"
 "$tools/aapt2" link -o "$work/base.apk" -I "$jar" --manifest "$here/AndroidManifest.xml" -A "$work/assets" \
     --min-sdk-version 28 --target-sdk-version 28
 
