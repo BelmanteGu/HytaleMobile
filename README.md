@@ -42,11 +42,15 @@ A Mach-O loader translates only the operating system, and a bundled Java 25 runs
 
 <div align="center">
 
-| Touch gamepad | Combat |
+<img src="docs/media/evolution/17-gameplay.gif" width="640" alt="Walking through a forest on a Galaxy S23">
+
+<sub>Recorded on the phone (with the earlier round touch buttons).</sub>
+
+| Touch controls | Launcher |
 |:---:|:---:|
-| <img src="docs/media/evolution/11-touch-gamepad.jpg" alt="On-screen gamepad over the game"> | <img src="docs/media/evolution/12-combat.jpg" alt="Death screen after a fight with a Skeleton Fighter"> |
-| **Main menu with your avatar** | **Hyprism launcher** |
-| <img src="docs/media/evolution/06-avatar-in-menu.jpg" alt="Main menu with the account's avatar"> | <img src="docs/media/evolution/01-launcher.jpg" alt="Hyprism launcher on Android"> |
+| <img src="docs/media/evolution/20-touch-controls-bindings.jpg" alt="The touch controls over the game's Controls settings: each button shows its action and the controller label"> | <img src="docs/media/evolution/21-launcher-landscape.jpg" alt="The launcher in landscape with the Hytale logo"> |
+| **Combat** | **Main menu with your avatar** |
+| <img src="docs/media/evolution/19-skeleton-fight.jpg" alt="Fighting a Skeleton Fighter"> | <img src="docs/media/evolution/06-avatar-in-menu.jpg" alt="Main menu with the account's avatar"> |
 
 </div>
 
@@ -72,6 +76,11 @@ From the first window to a local world with the server on the phone, in order:
 | 14 | Lighting fixed: the client's light target was `GL_RGB10`, which OpenGL ES can't render to; the loader now maps it to `RGB10_A2` | <img src="docs/media/evolution/14-lighting-fixed.jpg" width="260"> |
 | 15 | Block light from torches inside ruins | <img src="docs/media/evolution/15-torchlit-ruins.jpg" width="260"> |
 | 16 | Forest with the on-screen stick and sunlight through the trees | <img src="docs/media/evolution/16-forest-touch-stick.jpg" width="260"> |
+| 17 | Gameplay recorded on the phone: 57 FPS while walking, locked to the 60 Hz panel | <img src="docs/media/evolution/17-gameplay.gif" width="260"> |
+| 18 | A lighter world server: half the CPU and about 450 MB less memory | <img src="docs/media/evolution/18-forest-walk.jpg" width="260"> |
+| 19 | Fighting a Skeleton Fighter | <img src="docs/media/evolution/19-skeleton-fight.jpg" width="260"> |
+| 20 | New touch controls: each button shows its action, with the controller label in the corner, matching Hytale's own bindings | <img src="docs/media/evolution/20-touch-controls-bindings.jpg" width="260"> |
+| 21 | The launcher laid out for a landscape phone, with the Hytale logo | <img src="docs/media/evolution/21-launcher-landscape.jpg" width="260"> |
 
 The detailed log, in Portuguese, is in [progress/PROGRESS.md](progress/PROGRESS.md).
 
@@ -82,9 +91,11 @@ The detailed log, in Portuguese, is in [progress/PROGRESS.md](progress/PROGRESS.
 | 🚀 **Native** | The macOS arm64 client (NativeAOT .NET) is mapped by a Mach-O loader and runs directly on the CPU. Only the operating system's interfaces are translated, onto Bionic, SDL3, MobileGlues and OpenAL Soft. |
 | 🌍 **Local worlds** | A bundled OpenJDK 25 runs `HytaleServer.jar` on the phone, started by the client as on desktop. The server's native libraries (QUIC, RocksDB, zstd) are built for Android. |
 | 🌐 **Online servers** | Session certificate, QUIC with mTLS and HTTPS work over Android's own TLS. |
-| 🎮 **Touch gamepad** | An on-screen gamepad feeds an SDL virtual controller: stick to move, swipe to look, ABXY, triggers, bumpers, D-pad and menus. The **PAD** button turns it off so touches act as a mouse in menus. |
+| 🎮 **Touch controls** | An on-screen gamepad feeds an SDL virtual controller. Every button shows its action (jump, crouch, attack, interact, abilities…) with the controller label in the corner, following Hytale's own bindings; the ability buttons press RB + Y/X for you. Stick to move, swipe to look. The **PAD** button turns it off so touches act as a mouse in menus. |
+| 🧊 **Runs cooler** | VSync at the 60 Hz panel instead of an uncapped frame rate, sustained-performance mode, a lighter OpenAL mix, and a world server tuned for a phone: bounded heap, fewer GC and JIT threads, no busy-waiting tick, 20 ticks per second, kept off the fastest core. |
 | 🔊 **Audio** | OpenAL Soft on OpenSL ES. |
-| 🔑 **Official sign-in** | The Hyprism launcher signs in with your Hytale account and hands the session to the game. |
+| 🔑 **Official sign-in** | The launcher signs in with your Hytale account, keeps the session through network hiccups and hands it to the game. |
+| 📱 **Landscape launcher** | The launcher fits a landscape phone: Hytale logo, compact sidebar, full screen. |
 
 ## 📋 Requirements
 
@@ -94,6 +105,17 @@ The detailed log, in Portuguese, is in [progress/PROGRESS.md](progress/PROGRESS.
 | **Storage** | ~4.5 GB for the game files, ~200 MB for the Java runtime |
 | **Game** | Your Hytale account and the **macOS** client files (`Client`, `Assets.zip`, `Server`), release build 34 |
 | **Input** | On-screen gamepad, a Bluetooth/USB controller, or touch as a mouse |
+
+## 📥 Download
+
+The APKs are on the [Releases](https://github.com/BelmanteGu/HytaleMobile/releases) page:
+
+| File | What it is |
+|---|---|
+| `hytale-launcher.apk` | The launcher: sign in, pick the game version, start the game |
+| `hytale-game.apk` | The game host: the Mach-O loader, SDL3, MobileGlues, OpenAL Soft and the touch controls |
+
+You still need your own game files on the phone, and for local worlds the Java runtime, which `server/install.sh` puts on the phone from a computer with `adb`. Both steps are in the [Android guide](Docs/content/en/development/android.mdx).
 
 ## ⚙️ How it works
 
@@ -156,7 +178,9 @@ The game files go to `/sdcard/Android/data/org.hyprism.game/files` (see the guid
 | ✅ | On-screen gamepad, Bluetooth/USB controllers |
 | ✅ | ~60 FPS at 50% render scale and 64-block view distance |
 | ✅ | World lighting: sun, sky ambient, torch light and shadows (the deferred "full light" target was `GL_RGB10`, which OpenGL ES can't render to) |
-| 🚧 | Signing in from the phone's browser: Cloudflare's check doesn't finish in Chrome; signing in on a computer with `adb forward` works |
+| ✅ | World server on the phone: about 1 CPU core instead of 2, ~700 MB instead of ~1.2 GB |
+| 🚧 | Exploring new land still costs CPU while the server generates it; a pre-generated area (made on a computer) avoids it |
+| 🚧 | Signing in from the phone's browser: Cloudflare's check may not finish in Chrome; the launcher logs the sign-in link so it can be finished on a computer with `adb forward` |
 | 🚧 | The client closes with *Broken pipe* if the local server stops |
 
 ## ⚖️ Legal

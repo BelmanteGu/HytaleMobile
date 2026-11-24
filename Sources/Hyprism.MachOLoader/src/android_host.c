@@ -94,6 +94,24 @@ int SDL_main(int argc, char *argv[])
         }
         fclose(env);
     }
+    // OpenAL Soft reads <files>/alsoft.conf (ALSOFT_CONF in env.txt picks another file). The default
+    // one asks for plain stereo panning and a linear resampler instead of UHJ encoding and the spline
+    // resampler, which cost a phone's CPU for a difference only good headphones reveal. Edit or delete
+    // the file to change it; a deleted file is written again with these defaults.
+    char al_conf[PATH_MAX];
+    snprintf(al_conf, sizeof al_conf, "%s/alsoft.conf", files);
+    if (access(al_conf, F_OK) != 0) {
+        FILE *conf = fopen(al_conf, "w");
+        if (conf) {
+            fputs("# OpenAL Soft settings for Hytale on Android, see alsoftrc.sample in OpenAL Soft.\n"
+                  "[general]\n"
+                  "stereo-encoding = panpot\n"
+                  "resampler = linear\n", conf);
+            fclose(conf);
+        }
+    }
+    setenv("ALSOFT_CONF", al_conf, 0);
+
     // Desktop OpenGL 4.x on the device's OpenGL ES driver through MobileGlues.
     char mg_dir[PATH_MAX];
     snprintf(mg_dir, sizeof mg_dir, "%s/MG", files);

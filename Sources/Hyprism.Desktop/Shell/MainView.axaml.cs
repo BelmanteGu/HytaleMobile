@@ -35,6 +35,34 @@ public sealed partial class MainView : UserControl
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+        if (OperatingSystem.IsAndroid())
+            ApplyPhoneLayout();
+    }
+
+    /// <summary>
+    /// A landscape phone (about 890 x 410 dp on a Galaxy S23) has a third of a desktop window's height:
+    /// no window title band, a narrower sidebar with its four entries and no account card, and the
+    /// Hytale logo in place of the launcher name.
+    /// </summary>
+    private void ApplyPhoneLayout()
+    {
+        LauncherShell.RowDefinitions[0].Height = new GridLength(0);
+        ShellContentGrid.ColumnDefinitions[0].Width = new GridLength(196);
+        ShellContentGrid.ColumnSpacing = 10;
+        ShellContentGrid.Margin = new Thickness(12, 10, 10, 10);
+        PrimaryNavigation.Spacing = 0;
+
+        HyprismBrand.IsVisible = false;
+        HytaleBrand.IsVisible = true;
+
+        // The account lives under Profiles; the sidebar ends with Settings.
+        SidebarAccountCard.IsVisible = false;
+
+        StartupBrandLogo.Source = new Avalonia.Media.Imaging.Bitmap(
+            Avalonia.Platform.AssetLoader.Open(new Uri("avares://Hyprism.Desktop/Assets/Brands/hytale-logo.png")));
+        StartupBrandLogo.Width = double.NaN;
+        StartupBrandLogo.Height = 56;
+        StartupBrandLabel.IsVisible = false;
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)

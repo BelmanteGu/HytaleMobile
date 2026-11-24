@@ -35,6 +35,9 @@ SPDX-License-Identifier: GPL-3.0-only
         </TranslateTransform>
       </Border.RenderTransform>
       <ContentControl Classes="managerRailSurface">
+        <!-- Scrolls when the list is taller than the pane, as on a landscape phone. -->
+        <controls:SmoothScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                     VerticalScrollBarVisibility="Auto">
         <StackPanel Classes="managerRailList">
               <ItemsControl x:Name="InstancesItems" ItemsSource="{Binding AllInstances}">
                 <ItemsControl.ItemsPanel>
@@ -147,6 +150,7 @@ SPDX-License-Identifier: GPL-3.0-only
                 </StackPanel>
               </Button>
         </StackPanel>
+        </controls:SmoothScrollViewer>
       </ContentControl>
     </Border>
 </UserControl>

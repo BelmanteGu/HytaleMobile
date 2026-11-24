@@ -2,19 +2,131 @@
 # Copyright (C) 2026 Hyprism Launcher
 # SPDX-License-Identifier: GPL-3.0-only
 #
-# Starts the local world server with the bundled JDK. Android's app seccomp
-# filter kills the process on get_mempolicy, which Shenandoah calls, so the
-# client's Shenandoah options are replaced with G1.
-J=/data/user/0/org.hyprism.game/files/jdk
+# Starts the local world server with the bundled JDK, tuned for a phone.
+#
+# The client launches the server with desktop settings: Shenandoah, -Xms768M and no heap limit, so
+# the JVM may grow to a quarter of the phone's RAM and keeps what it took. Measured with the build 34
+# server (Temurin 26, G1, fresh universe): 3208 MB committed with the client's settings, 656 MB with
+# the ones below, and 27% less CPU to boot.
+#
+#   - Shenandoah is replaced with G1: Android's app seccomp filter kills the process on
+#     get_mempolicy, which Shenandoah calls.
+#   - Heap from 512 MB up to HYPRISM_SERVER_HEAP (default 1536M, a ceiling against running out in a
+#     big world; the server's live data after boot is about 300 MB). With a player in the world on the
+#     S23, G1's concurrent marking ran non-stop (74% of a core) under a tight heap
+#     (MaxHeapFreeRatio=30), periodic collections and the adaptive marking threshold, and the GC log
+#     showed extra cycles for metaspace and code cache growth. So: no periodic GC, marking starts at a
+#     fixed 70% occupancy, and metaspace and code cache start large enough. The GC log is in
+#     files/server-gc.log.
+#   - Two GC threads, two JIT compiler threads and three common-pool workers, so the server does not
+#     wake every core at once.
+#   - The world ticks at HYPRISM_SERVER_TPS (default 20, the desktop server runs 30; systems scale by
+#     the tick's delta time), and the tick loop sleeps instead of spinning: the server busy-waits the
+#     last 3 ms of every tick ("sleep offset"), about a tenth of a core for the world thread alone.
+#     The asset file watcher is off; a singleplayer world does not reload assets.
+#   - The server stays off the fastest core(s) (cpu_capacity), which the client's render thread
+#     needs, and runs at a lower priority than the game. HYPRISM_SERVER_CORES=all turns that off,
+#     a hex mask picks the cores.
+#   - An AOT cache (JDK 25, JEP 483) of the server's classes, made on the phone: the first run
+#     records which classes load, the next one builds the cache in the background, later runs use
+#     it (15% less CPU and 1.5 s less to boot, measured). HYPRISM_SERVER_AOT=0 turns it off.
+#   - HYPRISM_SERVER_OPTS adds JVM options (they win over the ones above).
+umask 077
+H=${HYPRISM_HOME:-/data/user/0/org.hyprism.game}
+J=${HYPRISM_JDK:-$H/files/jdk}
+A=$H/files/aot
+CPUS=${HYPRISM_SYSFS_CPU:-/sys/devices/system/cpu}
+
+jar=
+prev=
 n=$#
 i=0
 while [ "$i" -lt "$n" ]; do
     a=$1
     shift
     case "$a" in
-        -XX:+UseShenandoahGC|-XX:Shenandoah*) ;;
+        -XX:+UseShenandoahGC|-XX:Shenandoah*|-Xms*|-Xmx*|-XX:AOTCache=*|-XX:AOTMode=*) ;;
         *) set -- "$@" "$a" ;;
     esac
+    [ "$prev" = -jar ] && jar=$a
+    prev=$a
     i=$((i + 1))
 done
-exec "$J/bin/java" -XX:+UseG1GC "$@"
+
+opts="-XX:+UseG1GC -Xms512M -Xmx${HYPRISM_SERVER_HEAP:-1536M}"
+opts="$opts -XX:-G1UseAdaptiveIHOP -XX:InitiatingHeapOccupancyPercent=70 -XX:G1ReservePercent=10"
+# Chunk data arrays over half a region are "humongous" objects, which start marking cycles early and
+# waste the rest of their regions; with 1 MB regions the S23's GC log showed 60-90 of them.
+opts="$opts -XX:G1HeapRegionSize=4m"
+opts="$opts -XX:ParallelGCThreads=2 -XX:ConcGCThreads=1 -XX:MetaspaceSize=192m"
+opts="$opts -XX:CICompilerCount=2 -XX:ReservedCodeCacheSize=128m"
+opts="$opts -Djava.util.concurrent.ForkJoinPool.common.parallelism=3"
+# The last two runs' GC log, to tell a busy world from a heap that is too small.
+opts="$opts -Xlog:gc*:file=$H/files/server-gc.log:time,uptime:filecount=2,filesize=4m"
+
+# AOT cache. Every file carries the jar and JVM it was made for, so a game update starts over.
+if [ "${HYPRISM_SERVER_AOT:-1}" != 0 ] && [ -n "$jar" ] && [ -f "$jar" ] && mkdir -p "$A" 2>/dev/null; then
+    stamp="$(ls -ln "$jar" "$J/lib/server/libjvm.so" 2>/dev/null | awk '{print $5, $6, $7, $8}' | tr '\n' ' ')"
+    aot="-XX:+UseCompactObjectHeaders -XX:-AOTClassLinking"
+    if [ -s "$A/server.aot" ] && [ "$(cat "$A/server.aot.stamp" 2>/dev/null)" = "$stamp" ]; then
+        opts="$opts $aot -XX:AOTCache=$A/server.aot"
+    elif [ "$(cat "$A/failed.stamp" 2>/dev/null)" = "$stamp" ]; then
+        :
+    elif [ -s "$A/server.aotconf" ] && [ "$(cat "$A/server.aotconf.stamp" 2>/dev/null)" = "$stamp" ]; then
+        # Build the cache from the recorded configuration, at the lowest priority, while this run
+        # starts without one. A build cut short leaves only the .tmp file and is tried again later.
+        if ! [ -f "$A/server.aot.tmp" ] || [ -n "$(find "$A/server.aot.tmp" -mmin +10 2>/dev/null)" ]; then
+            (
+                rm -f "$A/server.aot.tmp"
+                if nice -n 19 "$J/bin/java" -Xmx1024M $aot -XX:AOTMode=create \
+                        -XX:AOTConfiguration="$A/server.aotconf" -XX:AOTCache="$A/server.aot.tmp" \
+                        -jar "$jar" > "$A/create.log" 2>&1 && [ -s "$A/server.aot.tmp" ]; then
+                    mv "$A/server.aot.tmp" "$A/server.aot" && echo "$stamp" > "$A/server.aot.stamp"
+                    rm -f "$A/server.aotconf"
+                else
+                    rm -f "$A/server.aot.tmp" "$A/server.aotconf"
+                    echo "$stamp" > "$A/failed.stamp"
+                fi
+            ) < /dev/null > /dev/null 2>&1 &
+        fi
+    else
+        # Record this run; the JVM writes the configuration only when the server shuts down normally
+        # (leaving the world from the menu). Closing the app kills it and leaves an empty file, so after
+        # three such runs for this jar the wrapper stops recording until the game is updated.
+        tries=0
+        [ "$(sed -n 1p "$A/record.tries" 2>/dev/null)" = "$stamp" ] && tries=$(sed -n 2p "$A/record.tries")
+        if [ "${tries:-0}" -lt 3 ]; then
+            printf '%s\n%s\n' "$stamp" $((tries + 1)) > "$A/record.tries"
+            rm -f "$A/server.aot" "$A/server.aot.stamp" "$A/server.aotconf"
+            echo "$stamp" > "$A/server.aotconf.stamp"
+            opts="$opts $aot -XX:AOTMode=record -XX:AOTConfiguration=$A/server.aotconf"
+        fi
+    fi
+fi
+opts="$opts ${HYPRISM_SERVER_OPTS:-}"
+
+# Keep the server off the fastest cores and below the game's priority.
+run=
+if [ "${HYPRISM_SERVER_CORES:-auto}" != all ] && command -v taskset > /dev/null 2>&1; then
+    mask=${HYPRISM_SERVER_CORES:-auto}
+    if [ "$mask" = auto ]; then
+        max=0
+        for c in "$CPUS"/cpu[0-9]*; do
+            cap=$(cat "$c/cpu_capacity" 2>/dev/null || echo 0)
+            [ "$cap" -gt "$max" ] && max=$cap
+        done
+        m=0
+        for c in "$CPUS"/cpu[0-9]*; do
+            cap=$(cat "$c/cpu_capacity" 2>/dev/null || echo 0)
+            [ "$cap" -gt 0 ] && [ "$cap" -lt "$max" ] && m=$((m | (1 << ${c##*cpu})))
+        done
+        mask=
+        [ "$m" -gt 0 ] && mask=$(printf '%x' "$m")
+    fi
+    [ -n "$mask" ] && run="taskset $mask"
+fi
+command -v nice > /dev/null 2>&1 && run="$run nice -n 3"
+
+# shellcheck disable=SC2086 # $run and $opts are word lists without spaces in their words
+exec $run "$J/bin/java" $opts "$@" --disable-file-watcher \
+    --boot-command "sleep offset --offset=0" --boot-command "world tps ${HYPRISM_SERVER_TPS:-20}"
