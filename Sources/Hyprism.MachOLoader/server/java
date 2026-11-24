@@ -55,6 +55,9 @@ done
 
 opts="-XX:+UseG1GC -Xms512M -Xmx${HYPRISM_SERVER_HEAP:-1536M}"
 opts="$opts -XX:-G1UseAdaptiveIHOP -XX:InitiatingHeapOccupancyPercent=70 -XX:G1ReservePercent=10"
+# Chunk data arrays over half a region are "humongous" objects, which start marking cycles early and
+# waste the rest of their regions; with 1 MB regions the S23's GC log showed 60-90 of them.
+opts="$opts -XX:G1HeapRegionSize=4m"
 opts="$opts -XX:ParallelGCThreads=2 -XX:ConcGCThreads=1 -XX:MetaspaceSize=192m"
 opts="$opts -XX:CICompilerCount=2 -XX:ReservedCodeCacheSize=128m"
 opts="$opts -Djava.util.concurrent.ForkJoinPool.common.parallelism=3"
