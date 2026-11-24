@@ -90,10 +90,17 @@ if [ "${HYPRISM_SERVER_AOT:-1}" != 0 ] && [ -n "$jar" ] && [ -f "$jar" ] && mkdi
             ) < /dev/null > /dev/null 2>&1 &
         fi
     else
-        # Record this run; the JVM writes the configuration when the server shuts down normally.
-        rm -f "$A/server.aot" "$A/server.aot.stamp" "$A/server.aotconf"
-        echo "$stamp" > "$A/server.aotconf.stamp"
-        opts="$opts $aot -XX:AOTMode=record -XX:AOTConfiguration=$A/server.aotconf"
+        # Record this run; the JVM writes the configuration only when the server shuts down normally
+        # (leaving the world from the menu). Closing the app kills it and leaves an empty file, so after
+        # three such runs for this jar the wrapper stops recording until the game is updated.
+        tries=0
+        [ "$(sed -n 1p "$A/record.tries" 2>/dev/null)" = "$stamp" ] && tries=$(sed -n 2p "$A/record.tries")
+        if [ "${tries:-0}" -lt 3 ]; then
+            printf '%s\n%s\n' "$stamp" $((tries + 1)) > "$A/record.tries"
+            rm -f "$A/server.aot" "$A/server.aot.stamp" "$A/server.aotconf"
+            echo "$stamp" > "$A/server.aotconf.stamp"
+            opts="$opts $aot -XX:AOTMode=record -XX:AOTConfiguration=$A/server.aotconf"
+        fi
     fi
 fi
 opts="$opts ${HYPRISM_SERVER_OPTS:-}"
