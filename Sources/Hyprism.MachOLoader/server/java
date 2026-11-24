@@ -13,8 +13,10 @@
 #     get_mempolicy, which Shenandoah calls.
 #   - Heap from 256 MB up to HYPRISM_SERVER_HEAP (default 1536M, a ceiling against running out in a
 #     big world; the server's live data after boot is about 260 MB). G1 hands free memory back to
-#     Android: a periodic collection when idle and at most 30% of the heap left free. On an Android
-#     emulator the server's RSS after boot went from 1161-1173 MB to 689-728 MB.
+#     Android with a periodic collection when idle. Keeping the heap tighter still
+#     (MaxHeapFreeRatio=30) saved memory on an idle server but, with a player in the world on the S23,
+#     left G1's concurrent marking running non-stop (74% of a core), so it is not used. The GC log is
+#     in files/server-gc.log.
 #   - Two GC threads and two JIT compiler threads, so the server does not wake every core at once.
 #   - The server stays off the fastest core(s) (cpu_capacity), which the client's render thread
 #     needs, and runs at a lower priority than the game. HYPRISM_SERVER_CORES=all turns that off,
@@ -46,8 +48,10 @@ while [ "$i" -lt "$n" ]; do
 done
 
 opts="-XX:+UseG1GC -Xms256M -Xmx${HYPRISM_SERVER_HEAP:-1536M} -XX:G1PeriodicGCInterval=30000"
-opts="$opts -XX:MinHeapFreeRatio=10 -XX:MaxHeapFreeRatio=30 -XX:ParallelGCThreads=2 -XX:ConcGCThreads=1"
+opts="$opts -XX:ParallelGCThreads=2 -XX:ConcGCThreads=1"
 opts="$opts -XX:CICompilerCount=2 -XX:ReservedCodeCacheSize=96m"
+# The last two runs' GC log, to tell a busy world from a heap that is too small.
+opts="$opts -Xlog:gc*:file=$H/files/server-gc.log:time,uptime:filecount=2,filesize=4m"
 
 # AOT cache. Every file carries the jar and JVM it was made for, so a game update starts over.
 if [ "${HYPRISM_SERVER_AOT:-1}" != 0 ] && [ -n "$jar" ] && [ -f "$jar" ] && mkdir -p "$A" 2>/dev/null; then
