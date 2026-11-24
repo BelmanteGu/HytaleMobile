@@ -28,6 +28,15 @@ public sealed class MainApplication : AvaloniaAndroidApplication<App>
         // The launcher log goes to Console.Out, which Android drops; send it to logcat (tag Hyprism) so a
         // failed login or token refresh can be read with adb logcat -s Hyprism. LauncherStartup captures it.
         Console.SetOut(new LogcatWriter());
+        Hyprism.Desktop.Platform.PlatformActions.PregenerateWorld = () =>
+        {
+            var context = global::Android.App.Application.Context;
+            var intent = new global::Android.Content.Intent();
+            intent.SetComponent(new global::Android.Content.ComponentName(
+                AndroidGameHost.HostPackage, "org.hyprism.game.PregenerateActivity"));
+            intent.AddFlags(global::Android.Content.ActivityFlags.NewTask);
+            context.StartActivity(intent);
+        };
         AndroidGameHost.EnsureHostInstance();
         LauncherStartup.Initialize(services =>
         {

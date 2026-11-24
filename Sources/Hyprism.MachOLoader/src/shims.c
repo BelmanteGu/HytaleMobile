@@ -18,6 +18,7 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/random.h>
+#include <sys/resource.h>
 #include <sys/uio.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -312,11 +313,72 @@ static int apple_threadid_np(pthread_t t, uint64_t *id)
     return 0;
 }
 
+// CPUs below the highest cpu_capacity (on a Snapdragon 8 Gen 2: all but the Cortex-X3), or 0 on a
+// phone whose cores are all alike.
+static unsigned long helper_core_mask(void)
+{
+    static unsigned long mask = ~0UL;
+    if (mask != ~0UL)
+        return mask;
+    int caps[64] = { 0 }, max = 0, n = 0;
+    for (; n < 64; n++) {
+        char path[64];
+        snprintf(path, sizeof path, "/sys/devices/system/cpu/cpu%d/cpu_capacity", n);
+        FILE *f = fopen(path, "r");
+        if (!f)
+            break;
+        if (fscanf(f, "%d", &caps[n]) != 1)
+            caps[n] = 0;
+        fclose(f);
+        if (caps[n] > max)
+            max = caps[n];
+    }
+    unsigned long m = 0;
+    for (int i = 0; i < n; i++)
+        if (caps[i] > 0 && caps[i] < max)
+            m |= 1UL << i;
+    mask = m;
+    return mask;
+}
+
+// The client names its threads when they start (on the thread itself). Its main thread, which also
+// renders, keeps every core; helper threads leave the fastest core to it, and the chunk mesher and
+// the background packet thread also run below its priority, so building terrain while exploring no
+// longer competes with drawing the frame. HYPRISM_THREADS=0 turns this off.
+static void place_named_thread(const char *name)
+{
+    static int enabled = -1;
+    if (enabled < 0) {
+        const char *env = getenv("HYPRISM_THREADS");
+        enabled = !(env && env[0] == '0');
+    }
+    if (!enabled || !name || strstr(name, "MainThread"))
+        return;
+    int helper = strstr(name, "ChunkMeshing") || strstr(name, "Background") || strstr(name, "Audio") ||
+                 strstr(name, "alsoft") || strstr(name, "Thread-") || strstr(name, "Worker") ||
+                 strstr(name, "Pool") || strstr(name, ".NET");
+    if (!helper)
+        return;
+    unsigned long mask = helper_core_mask();
+    if (mask) {
+        cpu_set_t set;
+        CPU_ZERO(&set);
+        for (int i = 0; i < 64 && i < CPU_SETSIZE; i++)
+            if (mask & (1UL << i))
+                CPU_SET(i, &set);
+        sched_setaffinity(0, sizeof set, &set);
+    }
+    if (strstr(name, "ChunkMeshing") || strstr(name, "Background"))
+        setpriority(PRIO_PROCESS, gettid(), 3);
+}
+
 static int apple_setname_np(const char *name)
 {
     char shortened[16];
     snprintf(shortened, sizeof shortened, "%s", name);
-    return errno_to_apple(pthread_setname_np(pthread_self(), shortened));
+    int result = pthread_setname_np(pthread_self(), shortened);
+    place_named_thread(name);
+    return errno_to_apple(result);
 }
 
 // ---------------------------------------------------------------------------

@@ -119,11 +119,22 @@ int SDL_main(int argc, char *argv[])
     setenv("MG_DIR_PATH", mg_dir, 0);
     char mg_config[PATH_MAX];
     snprintf(mg_config, sizeof mg_config, "%s/config.json", mg_dir);
-    if (access(mg_config, F_OK) != 0) {
-        // Hytale requires an OpenGL 4.1 core context; cache translated shaders.
+    // Hytale requires an OpenGL 4.1 core context; cache translated shaders; enableNoError 2 makes
+    // MobileGlues skip its glGetError checks after every forwarded call (CPU time per draw). The
+    // file is rewritten while it is one of the loader's own versions, and left alone once edited.
+    static const char mg_defaults[] =
+        "{\n  \"customGLVersion\": 41,\n  \"maxGlslCacheSize\": 128,\n  \"enableNoError\": 2\n}\n";
+    static const char mg_previous[] = "{\n  \"customGLVersion\": 41,\n  \"maxGlslCacheSize\": 128\n}\n";
+    char current[256] = { 0 };
+    FILE *existing = fopen(mg_config, "r");
+    if (existing) {
+        fread(current, 1, sizeof current - 1, existing);
+        fclose(existing);
+    }
+    if (!existing || strcmp(current, mg_previous) == 0) {
         FILE *config = fopen(mg_config, "w");
         if (config) {
-            fputs("{\n  \"customGLVersion\": 41,\n  \"maxGlslCacheSize\": 128\n}\n", config);
+            fputs(mg_defaults, config);
             fclose(config);
         }
     }

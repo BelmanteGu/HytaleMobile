@@ -29,10 +29,18 @@ import java.util.Arrays;
  */
 public class HytaleActivity extends SDLActivity {
     static final String ARGUMENTS_EXTRA = "org.hyprism.game.ARGUMENTS";
+    private static volatile boolean running;
+
+    /** Whether the game is open, so the world must not be pre-generated now. */
+    static boolean isRunning() {
+        return running;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        running = true;
+        clearLeftoverPregeneration();
         // Draw under the camera cutout instead of leaving a black bar.
         getWindow().getAttributes().layoutInDisplayCutoutMode =
             WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
@@ -113,6 +121,41 @@ public class HytaleActivity extends SDLActivity {
             Log.i("HytaleHost", "installed the world server launcher");
         } catch (IOException e) {
             Log.w("HytaleHost", "world server launcher not updated: " + e);
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        running = false;
+        super.onDestroy();
+    }
+
+    /**
+     * PregenerateActivity sets ChunkConfig.PregenerateRegion only while it runs; if it was killed, the
+     * region would stay and the server would generate it during play. Remove any that was left.
+     */
+    private void clearLeftoverPregeneration() {
+        File[] saves = new File(getExternalFilesDir(null), "UserData/Saves").listFiles();
+        if (saves == null)
+            return;
+        for (File save : saves) {
+            File config = new File(save, "universe/worlds/default/config.json");
+            try {
+                if (!config.isFile())
+                    continue;
+                String text = new String(Files.readAllBytes(config.toPath()), java.nio.charset.StandardCharsets.UTF_8);
+                if (!text.contains("PregenerateRegion"))
+                    continue;
+                org.json.JSONObject json = new org.json.JSONObject(text);
+                org.json.JSONObject chunk = json.optJSONObject("ChunkConfig");
+                if (chunk != null) {
+                    chunk.remove("PregenerateRegion");
+                    Files.write(config.toPath(), json.toString(2).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    Log.i("HytaleHost", "removed a leftover pre-generation region from " + save.getName());
+                }
+            } catch (Exception e) {
+                Log.w("HytaleHost", "could not check " + config + ": " + e);
+            }
         }
     }
 

@@ -184,9 +184,17 @@ static SDL_FunctionPointer w_GL_GetProcAddress(const char *proc)
 /// Returns a wrapper for an SDL entry point, or NULL to use SDL directly.
 // HYPRISM_PERF=1 logs the frame rate every two seconds: frames per second, the average and worst
 // interval between buffer swaps, and how long SDL_GL_SwapWindow blocked (waiting for the GPU or vsync).
+void gl_tune_frame(void);
+
 static bool w_GL_SwapWindow(SDL_Window *window)
 {
     REAL(SDL_GL_SwapWindow);
+    gl_tune_frame();
+    static int perf = -1;
+    if (perf < 0)
+        perf = getenv("HYPRISM_PERF") != NULL;
+    if (!perf)
+        return real_SDL_GL_SwapWindow(window);
     static struct timespec last, window_start;
     static unsigned frames;
     static double sum_interval, max_interval, sum_swap;
@@ -248,7 +256,7 @@ void *sdl_scale_lookup(void *sdl_handle, const char *symbol)
         return (void *)w_GL_GetProcAddress;
     if (strcmp(symbol, "SDL_GL_SetSwapInterval") == 0)
         return (void *)w_GL_SetSwapInterval;
-    if (strcmp(symbol, "SDL_GL_SwapWindow") == 0 && getenv("HYPRISM_PERF"))
+    if (strcmp(symbol, "SDL_GL_SwapWindow") == 0 && (getenv("HYPRISM_PERF") || getenv("HYPRISM_GPU_PROFILE")))
         return (void *)w_GL_SwapWindow;
     if (g_scale == 1.0f)
         return NULL;

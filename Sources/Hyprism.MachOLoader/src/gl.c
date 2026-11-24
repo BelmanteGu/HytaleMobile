@@ -30,6 +30,16 @@ typedef unsigned int GLuint;
 typedef int GLint;
 typedef int GLsizei;
 
+// gl_tune.c
+void *gl_tune_entry(const char *name, void *fn, void *(*resolve)(const char *));
+void gl_tune_tex_image_2d(GLenum target, GLint level, GLint internal, GLsizei w, GLsizei h, GLint border,
+                          GLenum format, GLenum type, const void *pixels,
+                          void (*next)(GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum,
+                                       const void *));
+void gl_tune_use_program(GLuint program);
+int gl_tune_viewport_div(void);
+void gl_tune_note_viewport(GLint x, GLint y, GLsizei w, GLsizei h);
+
 static uint32_t arg32(const uint8_t *stack, size_t offset)
 {
     uint32_t v;
@@ -550,6 +560,7 @@ static void w_LinkProgram(GLuint program)
 
 static void w_UseProgram(GLuint program)
 {
+    gl_tune_use_program(program);
     real_UseProgram(program);
     g_current_program = program;
     set_flip_uniform();
@@ -557,6 +568,15 @@ static void w_UseProgram(GLuint program)
 
 static void w_Viewport(GLint x, GLint y, GLsizei w, GLsizei h)
 {
+    // Smaller shadow maps (gl_tune.c) are drawn with a matching viewport.
+    gl_tune_note_viewport(x, y, w, h);
+    int div = gl_tune_viewport_div();
+    if (div > 1) {
+        x /= div;
+        y /= div;
+        w /= div;
+        h /= div;
+    }
     real_Viewport(x, y, w, h);
     g_viewport_height = (float)(y + h);
     g_viewport_width = w;
@@ -862,7 +882,7 @@ static void fix_TexImage2D(GLenum target, GLint level, GLint internal, GLsizei w
         format = 0x1908;   // GL_RGBA
         type = 0x8036;     // GL_UNSIGNED_INT_10_10_10_2
     }
-    real_TexImage2D_rgb10(target, level, internal, w, h, border, format, type, pixels);
+    gl_tune_tex_image_2d(target, level, internal, w, h, border, format, type, pixels, real_TexImage2D_rgb10);
 }
 
 static void (*gl_DrawBuffers)(GLsizei, const GLenum *);
@@ -928,6 +948,7 @@ void *gl_entry(const char *name, void *fn, void *(*resolve)(const char *))
                                           const void *))fn;
         fn = (void *)fix_TexImage2D;
     }
+    fn = gl_tune_entry(name, fn, resolve);
     if (trace)
         fn = trace_entry(name, fn, resolve);
     for (size_t i = 0; i < SHIM_COUNT(k_glsl_entries); i++)
