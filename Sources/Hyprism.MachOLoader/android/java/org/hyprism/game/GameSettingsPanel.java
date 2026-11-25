@@ -108,7 +108,7 @@ final class GameSettingsPanel extends FrameLayout {
             toggle(GameSettings.pregenerate(activity), on -> GameSettings.setPregenerate(activity, on)), false);
 
         row("Tocar para mirar (estilo Bedrock)",
-            "Tocar num ponto da tela vira a câmera até ele e usa ou coloca; segurar quebra ou bate; arrastar mexe a câmera. O analógico fica no canto inferior esquerdo.",
+            "Tocar num ponto da tela vira a câmera até ele e usa ou coloca; segurar quebra ou bate; arrastar mexe a câmera. O botão de bater e quebrar some, o de defender continua. O analógico fica no canto inferior esquerdo.",
             toggle(GameSettings.touchAim(activity), on -> {
                 GameSettings.setTouchAim(activity, on);
                 pad.reloadSettings();

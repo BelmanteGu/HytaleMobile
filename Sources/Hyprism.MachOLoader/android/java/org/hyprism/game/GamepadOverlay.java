@@ -277,6 +277,10 @@ public class GamepadOverlay extends View {
 
     // The eye also stays while the pad is off, so it can be turned back on.
     private boolean visible(Control c) {
+        // With touch aiming the attack/break button is replaced by holding a finger on the view; the
+        // shield (defend, and place with a block) stays.
+        if (touchAim && c.axis == RIGHT_TRIGGER)
+            return false;
         return c.toggle || isGear(c) ? !physical && (!enabled || inGame || editing) : live();
     }
 
