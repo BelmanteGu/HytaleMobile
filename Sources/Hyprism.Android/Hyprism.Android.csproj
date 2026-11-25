@@ -19,8 +19,8 @@ SPDX-License-Identifier: GPL-3.0-only
          package name the game host had, so its files and worlds carry over -->
     <ApplicationId>org.hyprism.game</ApplicationId>
     <ApplicationTitle>Hytale</ApplicationTitle>
-    <ApplicationVersion>1</ApplicationVersion>
-    <ApplicationDisplayVersion>4.0.0</ApplicationDisplayVersion>
+    <ApplicationVersion>100</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0.0</ApplicationDisplayVersion>
     <Version>4.0.0</Version>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
     <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>

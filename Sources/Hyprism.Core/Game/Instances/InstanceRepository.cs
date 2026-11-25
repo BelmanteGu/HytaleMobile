@@ -512,7 +512,7 @@ public partial class InstanceRepository : IInstanceRepository
 
             if (Directory.Exists(versionPath))
             {
-                Directory.Delete(versionPath, true);
+                DeleteInstanceFolder(versionPath);
             }
 
             SyncInstancesWithConfig();
@@ -523,6 +523,35 @@ public partial class InstanceRepository : IInstanceRepository
             Logger.Error("Game", $"Error deleting game: {ex.Message}");
             return false;
         }
+    }
+
+    /// <summary>
+    /// Removes an instance folder. An instance that is a link to a folder it does not own (the game's
+    /// own files folder on Android, which also holds the player's worlds) loses only the game build:
+    /// the client, the server, the assets and the instance metadata, then the link itself.
+    /// </summary>
+    private static void DeleteInstanceFolder(string path)
+    {
+        if (new DirectoryInfo(path).LinkTarget is null)
+        {
+            Directory.Delete(path, true);
+            return;
+        }
+
+        foreach (var name in new[] { "Client", "Server", "staging-temp" })
+        {
+            var dir = Path.Combine(path, name);
+            if (Directory.Exists(dir))
+                Directory.Delete(dir, true);
+        }
+        foreach (var name in new[] { "Assets.zip", "Meta.json" })
+        {
+            var file = Path.Combine(path, name);
+            if (File.Exists(file))
+                File.Delete(file);
+        }
+        File.Delete(path);
+        Logger.Info("InstanceRepository", $"Removed the game build from {path}; the worlds in UserData were kept");
     }
 
     /// <summary>
@@ -549,7 +578,7 @@ public partial class InstanceRepository : IInstanceRepository
                     !string.Equals(instance.Id, instanceId, StringComparison.OrdinalIgnoreCase));
             }
 
-            Directory.Delete(versionPath, true);
+            DeleteInstanceFolder(versionPath);
 
             SyncInstancesWithConfig();
             return true;
