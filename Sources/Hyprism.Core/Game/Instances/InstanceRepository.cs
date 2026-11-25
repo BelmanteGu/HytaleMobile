@@ -335,7 +335,7 @@ public partial class InstanceRepository : IInstanceRepository
             string basePath = string.IsNullOrEmpty(sub) ? versionPath : Path.Combine(versionPath, sub);
             string clientPath;
 
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            if (LauncherUtilities.UsesMacClient)
             {
                 clientPath = Path.Combine(basePath, "Client", "Hytale.app", "Contents", "MacOS", "HytaleClient");
             }
@@ -366,7 +366,7 @@ public partial class InstanceRepository : IInstanceRepository
     public bool AreAssetsPresent(string versionPath)
     {
         string assetsCheck;
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        if (LauncherUtilities.UsesMacClient)
         {
             assetsCheck = Path.Combine(versionPath, "Client", "Hytale.app", "Contents", "Assets");
         }
@@ -807,7 +807,7 @@ public partial class InstanceRepository : IInstanceRepository
     private static bool CheckExecutablePresent(string folder)
     {
         string clientPath;
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        if (LauncherUtilities.UsesMacClient)
         {
             clientPath = Path.Combine(folder, "Client", "Hytale.app", "Contents", "MacOS", "HytaleClient");
         }
@@ -828,7 +828,7 @@ public partial class InstanceRepository : IInstanceRepository
     private static bool CheckAssetsPresent(string folder)
     {
         string assetsPath;
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        if (LauncherUtilities.UsesMacClient)
         {
             assetsPath = Path.Combine(folder, "Client", "Hytale.app", "Contents", "Assets");
         }
@@ -863,7 +863,7 @@ public partial class InstanceRepository : IInstanceRepository
     /// </summary>
     private static bool CheckLibrariesPresent(string folder)
     {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        if (LauncherUtilities.UsesMacClient)
         {
             var frameworksPath = Path.Combine(folder, "Client", "Hytale.app", "Contents", "Frameworks");
             if (Directory.Exists(frameworksPath))
@@ -908,7 +908,7 @@ public partial class InstanceRepository : IInstanceRepository
             Path.Combine(folder, "Client", "level0"),
         };
 
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        if (LauncherUtilities.UsesMacClient)
         {
             var dataPath = Path.Combine(folder, "Client", "Hytale.app", "Contents", "Data");
             return Directory.Exists(dataPath);
@@ -920,7 +920,7 @@ public partial class InstanceRepository : IInstanceRepository
 
     private static bool CheckInstanceValidity(string folder)
     {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        if (LauncherUtilities.UsesMacClient)
         {
             return File.Exists(Path.Combine(folder, "Client", "Hytale.app", "Contents", "MacOS", "HytaleClient"));
         }

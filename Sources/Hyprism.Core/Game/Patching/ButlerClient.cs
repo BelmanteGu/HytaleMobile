@@ -24,6 +24,13 @@ public partial class ButlerClient : IButlerClient
     private static readonly HttpClient HttpClient = new() { Timeout = TimeSpan.FromMinutes(5) };
 
     /// <summary>
+    /// A butler-compatible patcher shipped with the app, used instead of downloading butler. Android
+    /// sets it: itch.io publishes no butler for Android, so the APK carries pwrapply (butler's apply,
+    /// built without cgo) as a native library, the one place Android lets an app execute files from.
+    /// </summary>
+    public static string? BundledButlerPath { get; set; }
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="ButlerClient"/> class.
     /// Creates the Butler and Cache directories if they don't exist
     /// </summary>
@@ -39,6 +46,8 @@ public partial class ButlerClient : IButlerClient
     /// <inheritdoc/>
     public string GetButlerPath()
     {
+        if (BundledButlerPath is not null)
+            return BundledButlerPath;
         string name = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "butler.exe" : "butler";
         return Path.Combine(_butlerDir, name);
     }
@@ -61,6 +70,14 @@ public partial class ButlerClient : IButlerClient
         Directory.CreateDirectory(_cacheDir);
 
         string butlerPath = GetButlerPath();
+
+        if (BundledButlerPath is not null)
+        {
+            if (!File.Exists(butlerPath))
+                throw new Exception($"The bundled patcher is missing: {butlerPath}");
+            progressCallback?.Invoke(100, "launch.detail.butler_ready");
+            return butlerPath;
+        }
 
         if (File.Exists(butlerPath))
         {
@@ -300,7 +317,9 @@ public partial class ButlerClient : IButlerClient
         };
 
         using var process = Process.Start(psi) ?? throw new Exception("Failed to start Butler process");
-        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(8));
+        // A phone writes a full build (several GB) far slower than a PC.
+        var applyTimeout = BundledButlerPath is not null ? TimeSpan.FromMinutes(90) : TimeSpan.FromMinutes(8);
+        using var timeoutCts = new CancellationTokenSource(applyTimeout);
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(timeoutCts.Token, externalCancellationToken);
         var cts = linkedCts;
 
@@ -409,7 +428,7 @@ public partial class ButlerClient : IButlerClient
                 }
                 else
                 {
-                    Logger.Error("Butler", "Butler process timed out after 8 minutes");
+                    Logger.Error("Butler", $"Butler process timed out after {applyTimeout.TotalMinutes} minutes");
                     try { process.Kill(); } catch { }
                     throw new Exception("Installation timed out. Please try again.");
                 }
@@ -447,7 +466,7 @@ public partial class ButlerClient : IButlerClient
 
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            string clientPath = RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+            string clientPath = LauncherUtilities.UsesMacClient
                 ? Path.Combine(targetDir, "Client", "Hytale.app", "Contents", "MacOS", "HytaleClient")
                 : Path.Combine(targetDir, "Client", "HytaleClient");
 

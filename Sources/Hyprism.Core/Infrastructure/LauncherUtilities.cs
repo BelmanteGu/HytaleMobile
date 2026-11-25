@@ -204,11 +204,19 @@ public static class LauncherUtilities
     /// <returns>The normalized operating system identifier</returns>
     public static string GetOS()
     {
+        // Android runs the macOS arm64 client through the Hyprism Mach-O loader.
+        if (OperatingSystem.IsAndroid()) return "darwin";
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return "windows";
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) return "darwin";
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) return "linux";
         return "unknown";
     }
+
+    /// <summary>
+    /// True where the game is the macOS build (Client/Hytale.app): on macOS, and on Android, where the
+    /// Hyprism Mach-O loader runs that client.
+    /// </summary>
+    public static bool UsesMacClient => RuntimeInformation.IsOSPlatform(OSPlatform.OSX) || OperatingSystem.IsAndroid();
 
     /// <summary>
     /// Gets the current CPU architecture identifier.

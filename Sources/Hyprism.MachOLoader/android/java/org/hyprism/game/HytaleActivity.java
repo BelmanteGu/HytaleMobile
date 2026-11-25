@@ -15,13 +15,10 @@ import android.widget.Toast;
 import org.libsdl.app.SDLActivity;
 
 import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
-import java.util.Arrays;
 
 /**
  * Hosts the macOS Hytale client, loaded natively by libmain.so. The Hyprism
@@ -99,29 +96,9 @@ public class HytaleActivity extends SDLActivity {
         });
     }
 
-    /**
-     * Writes the world server launcher (server/java, shipped in the APK's assets) to files/java,
-     * where args.txt points the client, so a new APK brings its JVM settings without reinstalling
-     * the server runtime. It runs before the client starts and only rewrites a changed file.
-     */
+    /** Brings files/java up to date when the game is opened without SetupActivity (adb, old shortcuts). */
     private void installServerLauncher() {
-        File target = new File(getFilesDir(), "java");
-        try (InputStream in = getAssets().open("java")) {
-            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-            byte[] buffer = new byte[8192];
-            for (int n; (n = in.read(buffer)) > 0; )
-                bytes.write(buffer, 0, n);
-            byte[] wanted = bytes.toByteArray();
-            if (target.isFile() && Arrays.equals(Files.readAllBytes(target.toPath()), wanted))
-                return;
-            File tmp = new File(getFilesDir(), "java.tmp");
-            Files.write(tmp.toPath(), wanted);
-            if (!tmp.setExecutable(true, true) || !tmp.renameTo(target))
-                throw new IOException("could not replace " + target);
-            Log.i("HytaleHost", "installed the world server launcher");
-        } catch (IOException e) {
-            Log.w("HytaleHost", "world server launcher not updated: " + e);
-        }
+        new ServerSetup(this, message -> { }).installServerLauncher();
     }
 
     @Override

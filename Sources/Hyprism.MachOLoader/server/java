@@ -33,8 +33,14 @@
 #     records which classes load, the next one builds the cache in the background, later runs use
 #     it (15% less CPU and 1.5 s less to boot, measured). HYPRISM_SERVER_AOT=0 turns it off.
 #   - HYPRISM_SERVER_OPTS adds JVM options (they win over the ones above).
+#   - The game's Server/HytaleServer.jar is run from the copy the app adapted for Android
+#     (files/server/HytaleServer.jar, see ServerSetup.java), so the original stays as installed.
 umask 077
-H=${HYPRISM_HOME:-/data/user/0/org.hyprism.game}
+# This script is <app data>/files/java.
+case "$0" in
+    */files/java) H=${HYPRISM_HOME:-${0%/files/java}} ;;
+    *) H=${HYPRISM_HOME:-/data/user/0/org.hyprism.game} ;;
+esac
 J=${HYPRISM_JDK:-$H/files/jdk}
 A=$H/files/aot
 CPUS=${HYPRISM_SYSFS_CPU:-/sys/devices/system/cpu}
@@ -48,6 +54,9 @@ while [ "$i" -lt "$n" ]; do
     shift
     case "$a" in
         -XX:+UseShenandoahGC|-XX:Shenandoah*|-Xms*|-Xmx*|-XX:AOTCache=*|-XX:AOTMode=*) ;;
+        */Server/HytaleServer.jar)
+            [ "$prev" = -jar ] && [ -f "$H/files/server/HytaleServer.jar" ] && a=$H/files/server/HytaleServer.jar
+            set -- "$@" "$a" ;;
         *) set -- "$@" "$a" ;;
     esac
     [ "$prev" = -jar ] && jar=$a
