@@ -485,6 +485,21 @@ static void w_ShaderSource(GLuint shader, GLsizei count, const GLchar *const *st
             macho_log("gl", "shader %u: replaced %zu x '%s'", shader, hits, old);
         }
     }
+    // The occlusion test for models (HiZCullVS) reads a depth pyramid built with a geometry shader and
+    // read back by mip level with texelFetch; on OpenGL ES through MobileGlues that pyramid is wrong, so
+    // creatures, NPCs and minecarts were culled while in plain view and popped in and out while walking.
+    // Every box is reported visible instead (the frustum and distance checks elsewhere still apply).
+    // HYPRISM_HIZ_CULL=1 keeps the game's test.
+    static const char hiz_test[] = "return (instanceMinDepth <= maxDepth || distanceToCamera < threshold) ? 1 : 0;";
+    const char *keep_hiz = getenv("HYPRISM_HIZ_CULL");
+    char *hiz = strstr(joined, hiz_test);
+    if (hiz && !(keep_hiz && keep_hiz[0] == '1')) {
+        // Still reads the pyramid, so the compiler keeps uHiZBuffer: the game checks that it exists.
+        static const char visible[] = "return maxDepth < -1.0e37 ? 0 : 1;";
+        memcpy(hiz, visible, sizeof visible - 1);
+        memset(hiz + sizeof visible - 1, ' ', sizeof hiz_test - sizeof visible);
+        macho_log("gl", "shader %u: occlusion culling of models off (HYPRISM_HIZ_CULL=1 keeps it)", shader);
+    }
     struct shader_info *info = shader_info(shader, 1);
     char *rewritten = rewrite_upper_left(joined);
     if (info) {
