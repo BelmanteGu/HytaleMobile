@@ -241,6 +241,7 @@ public partial class GameLauncher : IGameLauncher
         if (_externalHost is not null)
         {
             await LaunchInExternalHostAsync(
+                versionPath,
                 currentProfile, authorizationUriPresenter, onlineMode, configuredAuthDomain, localNode, ct);
             return;
         }
@@ -327,6 +328,7 @@ public partial class GameLauncher : IGameLauncher
 
     // The external host owns the client files, so only authentication runs here.
     private async Task LaunchInExternalHostAsync(
+        string versionPath,
         Profile profile,
         AuthUriPresenter? authorizationUriPresenter,
         bool onlineMode,
@@ -356,7 +358,7 @@ public partial class GameLauncher : IGameLauncher
             arguments.AddRange(["--auth-mode", "offline"]);
 
         Logger.Info("Game", $"Handing launch for '{profile.Name}' to the external game host");
-        await _externalHost!.LaunchAsync(arguments, ct);
+        await _externalHost!.LaunchAsync(arguments, versionPath, ct);
     }
 
     private static (string executable, string workingDir) ResolveExecutablePaths(string versionPath)

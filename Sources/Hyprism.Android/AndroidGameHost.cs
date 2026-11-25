@@ -17,18 +17,22 @@ internal sealed class AndroidGameHost : IExternalGameHost
     // SetupActivity prepares the world server, then opens HytaleActivity with these arguments.
     internal const string SetupActivity = "org.hyprism.game.SetupActivity";
     internal const string ArgumentsExtra = "org.hyprism.game.ARGUMENTS";
+    internal const string GameDirectoryExtra = "org.hyprism.game.GAME_DIR";
 
     // The one instance on Android: the game reads its files from the app's external files folder.
     private const string HostInstanceId = "6f8d1c2a-4b7e-4a3f-9c55-0a1b2c3d4e5f";
     // The build the loader is tested with.
     private const int HostBuild = 34;
 
-    public Task LaunchAsync(IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+    public Task LaunchAsync(IReadOnlyList<string> arguments, string gameDirectory, CancellationToken cancellationToken)
     {
         var context = global::Android.App.Application.Context;
         var intent = new Intent(Intent.ActionMain);
         intent.SetComponent(new ComponentName(context.PackageName!, SetupActivity));
         intent.PutExtra(ArgumentsExtra, arguments.ToArray());
+        // The game runs the instance it is given; the default instance is a link to its files folder.
+        var target = new DirectoryInfo(gameDirectory).ResolveLinkTarget(returnFinalTarget: true)?.FullName;
+        intent.PutExtra(GameDirectoryExtra, target ?? gameDirectory);
         intent.AddFlags(ActivityFlags.NewTask | ActivityFlags.ClearTop);
         context.StartActivity(intent);
         return Task.CompletedTask;
@@ -54,6 +58,10 @@ internal sealed class AndroidGameHost : IExternalGameHost
         Directory.CreateDirectory(instances);
         var root = Path.Combine(instances, HostInstanceId);
         var link = new FileInfo(root);
+        // Someone who deleted the default instance and made their own keeps just theirs.
+        if (link.LinkTarget is null && !Directory.Exists(root) &&
+            Directory.EnumerateDirectories(instances).Any())
+            return;
         if (link.LinkTarget != gameFiles)
         {
             // A folder from an older launcher held only a marker file and Meta.json.

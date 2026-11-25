@@ -42,7 +42,8 @@ public class SetupActivity extends Activity {
         setContentView(layout);
         hideSystemBars();
 
-        ServerSetup setup = new ServerSetup(this, message -> runOnUiThread(() -> status.setText(message)));
+        String gameDir = getIntent() != null ? getIntent().getStringExtra(HytaleActivity.GAME_DIR_EXTRA) : null;
+        ServerSetup setup = new ServerSetup(this, message -> runOnUiThread(() -> status.setText(message)), gameDir);
         if (!setup.client().isFile()) {
             spinner.setVisibility(ProgressBar.GONE);
             status.setText("O Hytale ainda não está instalado.\nAbra o launcher e toque em Instalar.");

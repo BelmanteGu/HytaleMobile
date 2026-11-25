@@ -57,18 +57,25 @@ final class ServerSetup {
     private final File home;
     private final File files;
     private final File external;
+    private final File game;
 
     ServerSetup(Context context, Progress progress) {
+        this(context, progress, null);
+    }
+
+    /** @param gameDir the instance folder the launcher installed the game in (null: the files folder) */
+    ServerSetup(Context context, Progress progress, String gameDir) {
         this.context = context;
         this.progress = progress;
         this.home = context.getDataDir();
         this.files = context.getFilesDir();
         this.external = context.getExternalFilesDir(null);
+        this.game = gameDir != null ? new File(gameDir) : external;
     }
 
     /** The client binary the launcher installs; without it there is no game to start. */
     File client() {
-        return new File(external, "Client/Hytale.app/Contents/MacOS/HytaleClient");
+        return new File(game, "Client/Hytale.app/Contents/MacOS/HytaleClient");
     }
 
     File patchedJar() {
@@ -154,12 +161,12 @@ final class ServerSetup {
     // ---- server jar ---------------------------------------------------------------------------
 
     private void patchServerJar() throws IOException {
-        File original = new File(external, "Server/HytaleServer.jar");
+        File original = new File(game, "Server/HytaleServer.jar");
         if (!original.isFile())
             return;
         File patched = patchedJar();
         File stampFile = new File(files, "server/HytaleServer.jar.stamp");
-        String stamp = original.length() + " " + original.lastModified() + " " + apkStamp();
+        String stamp = original.getPath() + " " + original.length() + " " + original.lastModified() + " " + apkStamp();
         if (patched.isFile() && stamp.equals(readText(stampFile)))
             return;
         progress.report("Adaptando o servidor do jogo para Android…");

@@ -13,7 +13,8 @@ public interface IExternalGameHost
     /// Starts the client with the prepared game arguments.
     /// </summary>
     /// <param name="arguments">Client arguments such as the player name, UUID and session tokens.</param>
+    /// <param name="gameDirectory">The instance folder holding the client, server and assets.</param>
     /// <param name="cancellationToken">Cancels the launch request.</param>
     /// <returns>A task that completes once the host has been asked to start.</returns>
-    Task LaunchAsync(IReadOnlyList<string> arguments, CancellationToken cancellationToken);
+    Task LaunchAsync(IReadOnlyList<string> arguments, string gameDirectory, CancellationToken cancellationToken);
 }

@@ -74,11 +74,18 @@ int SDL_main(int argc, char *argv[])
         fprintf(stderr, "[host] no external storage path\n");
         return 1;
     }
-    static char exe[PATH_MAX], user[PATH_MAX], extra_path[PATH_MAX];
-    snprintf(exe, sizeof exe, "%s/Client/Hytale.app/Contents/MacOS/HytaleClient", files);
+    // The launcher instance to run (HytaleActivity sets it from the launcher's intent); the default
+    // instance is the files folder itself. Worlds and settings stay in <files>/UserData for every
+    // instance, so they survive reinstalling or switching the game build.
+    const char *game = getenv("HYPRISM_GAME_DIR");
+    if (!game || !*game)
+        game = files;
+    static char exe[PATH_MAX], user[PATH_MAX], extra_path[PATH_MAX], app_dir[PATH_MAX];
+    snprintf(app_dir, sizeof app_dir, "%s", game);
+    snprintf(exe, sizeof exe, "%s/Client/Hytale.app/Contents/MacOS/HytaleClient", game);
     snprintf(user, sizeof user, "%s/UserData", files);
     snprintf(extra_path, sizeof extra_path, "%s/args.txt", files);
-    chdir(files);
+    chdir(game);
     char env_path[PATH_MAX];
     snprintf(env_path, sizeof env_path, "%s/env.txt", files);
     FILE *env = fopen(env_path, "r");
@@ -148,7 +155,7 @@ int SDL_main(int argc, char *argv[])
     args[n++] = "hyprism-macho";
     args[n++] = exe;
     args[n++] = "--app-dir";
-    args[n++] = (char *)files;
+    args[n++] = app_dir;
     args[n++] = "--user-dir";
     args[n++] = user;
 

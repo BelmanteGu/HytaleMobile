@@ -26,6 +26,8 @@ import java.nio.file.Files;
  */
 public class HytaleActivity extends SDLActivity {
     static final String ARGUMENTS_EXTRA = "org.hyprism.game.ARGUMENTS";
+    /** The launcher instance to run; libmain.so reads it as HYPRISM_GAME_DIR (default: the files folder). */
+    static final String GAME_DIR_EXTRA = "org.hyprism.game.GAME_DIR";
     private static volatile boolean running;
 
     /** Whether the game is open, so the world must not be pre-generated now. */
@@ -35,6 +37,15 @@ public class HytaleActivity extends SDLActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        String gameDir = getIntent() != null ? getIntent().getStringExtra(GAME_DIR_EXTRA) : null;
+        try {
+            if (gameDir != null)
+                android.system.Os.setenv("HYPRISM_GAME_DIR", gameDir, true);
+            else
+                android.system.Os.unsetenv("HYPRISM_GAME_DIR");
+        } catch (android.system.ErrnoException e) {
+            Log.w("HytaleHost", "could not pass the game folder: " + e);
+        }
         super.onCreate(savedInstanceState);
         running = true;
         clearLeftoverPregeneration();
