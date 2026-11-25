@@ -41,14 +41,9 @@ final class GameSettings {
         return prefs(c).getBoolean("pregenerate", true);
     }
 
-    /** Bedrock-style touch: a tap aims at the point and uses or places, holding breaks or attacks. */
+    /** Bedrock-style touch: a tap anywhere uses or places at the crosshair, holding breaks or attacks. */
     static boolean touchAim(Context c) {
         return prefs(c).getBoolean("touchAim", false);
-    }
-
-    /** How far the camera turns to the touched point, as a factor of the calibrated amount (0.5 to 2). */
-    static float aimScale(Context c) {
-        return Math.max(0.5f, Math.min(2f, prefs(c).getFloat("aimScale", 1f)));
     }
 
     /** Scale of the touch controls, 0.6 to 1.6. */
@@ -74,10 +69,6 @@ final class GameSettings {
 
     static void setTouchAim(Context c, boolean on) {
         prefs(c).edit().putBoolean("touchAim", on).apply();
-    }
-
-    static void setAimScale(Context c, float scale) {
-        prefs(c).edit().putFloat("aimScale", scale).apply();
     }
 
     static void setControlSize(Context c, float size) {

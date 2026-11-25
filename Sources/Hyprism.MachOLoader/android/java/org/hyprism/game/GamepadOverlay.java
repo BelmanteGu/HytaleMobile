@@ -48,7 +48,6 @@ public class GamepadOverlay extends View {
     static native void nativeAxis(int axis, int value);
     static native void nativeButton(int button, boolean down);
     static native boolean nativeCaptured();
-    static native void nativeMouseMove(int dx, int dy);
 
     // The hotbar slots are the keys 1 to 9. They go through SDL's own Android key path, which updates the
     // keyboard state as well as queueing the event, so a client that polls the state sees them too.
@@ -110,10 +109,13 @@ public class GamepadOverlay extends View {
         tile("hud_settings", 0.2802f, 0.68f, START, false),
         tile("hud_list", 0.3908f, 0.69f, BACK, false),
         tile("hud_clock", 0.5000f, 0.63f, DPAD_UP, false),
-        tile("hud_eye", 0.6113f, 0.76f, -1, true),
+        // The eye switches the camera view (first and third person: the game's key V).
+        tile("hud_eye", 0.6113f, 0.76f, -1, false),
         tile("hud_addplayer", 0.7212f, 0.74f, DPAD_RIGHT, false),
         // The gear opens the phone settings panel (GameSettingsPanel); it has no gamepad button.
         tile(GEAR, 0.8312f, 0.62f, -1, false),
+        // The gamepad icon shows and hides the controls (hold it to edit the layout).
+        tile(PADICON, 0.9412f, 0.62f, -1, true),
         // Left side. The stick pad is drawn by drawStick.
         octagon("hud_sprint", EDGE_LEFT, 0.1010f, 0.2273f, 0.1422f, 0.48f, LEFT_STICK, -1),
         octagon("hud_shield", EDGE_LEFT, 0.1909f, 0.3558f, 0.1422f, 0.52f, -1, LEFT_TRIGGER),
@@ -137,7 +139,7 @@ public class GamepadOverlay extends View {
         PAD_FILL = 0x54141409, PAD_EDGE = 0x40140C00, KNOB_RING = 0xF2EDD2A2, KNOB_FILL = 0xE6D69F41,
         GLYPH = 0xFFC3CCDF, LABEL = 0xFFC3CCDF, ACCENT = 0xFFF2B33D;
 
-    private static final String GEAR = "sliders";
+    private static final String GEAR = "sliders", PADICON = "gamepad", VIEW = "hud_eye";
     private static final int ROLE_GEAR = -8;
     private static final int ROLE_STICK = -2, ROLE_LOOK = -3, ROLE_TOGGLE = -4, ROLE_EDIT = -5, ROLE_HOTBAR = -6,
         ROLE_NONE = -7;
@@ -147,18 +149,14 @@ public class GamepadOverlay extends View {
     // character keeps sprinting forward on its own, so the thumb is free for the camera. A new touch on
     // the stick side, the padlock or the sprint button gives control back.
     private static final float LOCK_AT = 1.9f, LOCK_CONE = 0.5f;
-    // Bedrock-style touch (GameSettings.touchAim). A finger that rests on the view (not on a control and
-    // outside the stick's corner) aims there: the camera turns until the touched point is under the
-    // crosshair, then a quick tap uses or places (left trigger) and holding for AIM_HOLD_MS breaks or
-    // attacks (right trigger) for as long as the finger stays. A finger that moves is just the camera.
+    // Touch to act (GameSettings.touchAim), as in Minecraft Bedrock with a crosshair: the crosshair stays at
+    // the centre of the screen and a finger on the view acts there, wherever it touches. A quick tap uses
+    // or places (left trigger); resting for AIM_HOLD_MS breaks or attacks (right trigger) while the finger
+    // stays; a finger that moves is just the camera.
     private static final int AIM_NONE = 0, AIM_PENDING = 1, AIM_HOLDING = 2;
     private static final long AIM_HOLD_MS = 220;
-    // Degrees the game turns per unit of relative mouse movement at its default mouse speed, measured on
-    // the phone (see PROGRESS.md); GameSettings.aimScale corrects it.
-    private static final float DEG_PER_COUNT = 0.07f;
     private boolean touchAim;
-    private float aimScale = 1f, fovDegrees = 75f;
-    private int aimState, glideToken;
+    private int aimState;
     private float aimX, aimY;
     private boolean aimTriggerDown;
     private final Runnable aimHold = this::aimHoldStart;
@@ -215,8 +213,6 @@ public class GamepadOverlay extends View {
                         Log.v(TAG, "pointer captured=" + captured + " -> controls " + (inGame ? "on" : "off"));
                     if (!inGame)
                         releaseAll();
-                    else
-                        loadFov(); // the player may have changed it in the settings
                     invalidate();
                 }
             }
@@ -233,8 +229,6 @@ public class GamepadOverlay extends View {
         prefs = context.getSharedPreferences("gamepad", Context.MODE_PRIVATE);
         controlScale = GameSettings.controlSize(context);
         touchAim = GameSettings.touchAim(context);
-        aimScale = GameSettings.aimScale(context);
-        loadFov();
         loadLayout();
         stroke.setStyle(Paint.Style.STROKE);
         stroke.setStrokeWidth(2 * getResources().getDisplayMetrics().density);
@@ -281,19 +275,20 @@ public class GamepadOverlay extends View {
         // shield (defend, and place with a block) stays.
         if (touchAim && c.axis == RIGHT_TRIGGER)
             return false;
-        return c.toggle || isGear(c) ? !physical && (!enabled || inGame || editing) : live();
+        return c.toggle || isAction(c) ? !physical && (!enabled || inGame || editing) : live();
     }
 
     private static boolean isGear(Control c) {
         return GEAR.equals(c.icon);
     }
 
-    private Control gear() {
-        for (Control c : controls)
-            if (isGear(c))
-                return c;
-        return null;
+    // Buttons that do something of their own instead of sending a gamepad button: the settings gear and
+    // the camera view.
+    private static boolean isAction(Control c) {
+        return GEAR.equals(c.icon) || VIEW.equals(c.icon);
     }
+
+    private Control actionControl;
 
     void setOnOpenSettings(Runnable open) {
         onOpenSettings = open;
@@ -312,7 +307,6 @@ public class GamepadOverlay extends View {
     void reloadSettings() {
         controlScale = GameSettings.controlSize(getContext());
         touchAim = GameSettings.touchAim(getContext());
-        aimScale = GameSettings.aimScale(getContext());
         invalidate();
     }
 
@@ -422,8 +416,9 @@ public class GamepadOverlay extends View {
                     handler.postDelayed(enterEditor, 600);
                 return true;
             }
-            if (top != null && isGear(top)) {
+            if (top != null && isAction(top)) {
                 roles.put(id, ROLE_GEAR);
+                actionControl = top;
                 top.down = true;
                 invalidate();
                 return true;
@@ -516,7 +511,7 @@ public class GamepadOverlay extends View {
                 handler.removeCallbacks(enterEditor);
             if (role != null && !editing)
                 release(role, action == MotionEvent.ACTION_CANCEL ? false : onToggle(x, y),
-                    action != MotionEvent.ACTION_CANCEL && overGear(x, y));
+                    action != MotionEvent.ACTION_CANCEL && overAction(x, y));
             if (lookPointer == id) {
                 lookPointer = -1;
                 if (touchAim)
@@ -539,12 +534,17 @@ public class GamepadOverlay extends View {
     private final Runnable hotbarUp = this::releaseHotbarKey;
 
     private void tapHotbar(int slot) {
+        tapKey(android.view.KeyEvent.KEYCODE_1 + slot);
+    }
+
+    // A short key press through SDL's own Android key path (see the note above).
+    private void tapKey(int keycode) {
         releaseHotbarKey();
-        hotbarKey = android.view.KeyEvent.KEYCODE_1 + slot;
+        hotbarKey = keycode;
         org.libsdl.app.SDLActivity.onNativeKeyDown(hotbarKey);
         handler.postDelayed(hotbarUp, 60);
         if (debug)
-            Log.v(TAG, "hotbar slot " + (slot + 1));
+            Log.v(TAG, "key " + keycode);
     }
 
     private void releaseHotbarKey() {
@@ -564,7 +564,7 @@ public class GamepadOverlay extends View {
 
     private void press(Control c, boolean down) {
         c.down = down;
-        if (isGear(c))
+        if (isAction(c))
             return; // no gamepad button behind it
         if (c.axis >= 0) {
             nativeAxis(c.axis, down ? AXIS_MAX : AXIS_MIN);
@@ -582,21 +582,28 @@ public class GamepadOverlay extends View {
         }
     }
 
-    private boolean overGear(float x, float y) {
+    private boolean overAction(float x, float y) {
         Control c = hit(x, y);
-        return c != null && isGear(c);
+        return c != null && c == actionControl;
     }
 
-    private void release(int role, boolean onToggle, boolean onGear) {
+    private void release(int role, boolean onToggle, boolean onAction) {
         if (role == ROLE_TOGGLE) {
             if (onToggle)
                 setGamepadEnabled(!enabled);
         } else if (role == ROLE_GEAR) {
-            Control g = gear();
-            if (g != null)
-                g.down = false;
-            if (onGear && onOpenSettings != null)
-                onOpenSettings.run();
+            Control a = actionControl;
+            actionControl = null;
+            if (a != null)
+                a.down = false;
+            if (onAction && a != null) {
+                if (isGear(a)) {
+                    if (onOpenSettings != null)
+                        onOpenSettings.run();
+                } else {
+                    tapKey(android.view.KeyEvent.KEYCODE_V); // switch camera view
+                }
+            }
         } else if (role == ROLE_STICK) {
             stickActive = false;
             if (inLockZone) {
@@ -652,20 +659,6 @@ public class GamepadOverlay extends View {
         return x < padX() + 0.36f * h && y > h * 0.36f;
     }
 
-    private void loadFov() {
-        try {
-            java.io.File f = new java.io.File(getContext().getExternalFilesDir(null), "UserData/Settings.json");
-            if (!f.isFile())
-                return;
-            String json = new String(java.nio.file.Files.readAllBytes(f.toPath()), java.nio.charset.StandardCharsets.UTF_8);
-            java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"FieldOfView\"\\s*:\\s*([0-9.]+)").matcher(json);
-            if (m.find())
-                fovDegrees = Math.max(30f, Math.min(130f, Float.parseFloat(m.group(1))));
-        } catch (Exception e) {
-            Log.w(TAG, "could not read the field of view: " + e);
-        }
-    }
-
     private void aimBegin(float x, float y) {
         aimState = AIM_PENDING;
         aimX = x;
@@ -674,18 +667,14 @@ public class GamepadOverlay extends View {
         invalidate();
     }
 
-    // The finger rested for AIM_HOLD_MS: aim at it, then hold the attack/mine trigger.
+    // The finger rested for AIM_HOLD_MS: hold the attack/mine trigger until it lifts.
     private void aimHoldStart() {
         if (aimState != AIM_PENDING)
             return;
         aimState = AIM_HOLDING;
         performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-        glideTo(aimX, aimY, () -> {
-            if (aimState == AIM_HOLDING) {
-                aimTriggerDown = true;
-                nativeAxis(RIGHT_TRIGGER, AXIS_MAX);
-            }
-        });
+        aimTriggerDown = true;
+        nativeAxis(RIGHT_TRIGGER, AXIS_MAX);
         invalidate();
     }
 
@@ -697,16 +686,14 @@ public class GamepadOverlay extends View {
         }
     }
 
-    // The finger left: a tap (it never held or moved) aims and uses or places; a hold ends.
+    // The finger left: a tap (it never held or moved) uses or places; a hold ends.
     private void aimEnd(boolean released) {
         if (aimState == AIM_PENDING) {
             handler.removeCallbacks(aimHold);
             aimState = AIM_NONE;
             if (released) {
-                glideTo(aimX, aimY, () -> {
-                    nativeAxis(LEFT_TRIGGER, AXIS_MAX);
-                    handler.postDelayed(() -> nativeAxis(LEFT_TRIGGER, AXIS_MIN), 90);
-                });
+                nativeAxis(LEFT_TRIGGER, AXIS_MAX);
+                handler.postDelayed(() -> nativeAxis(LEFT_TRIGGER, AXIS_MIN), 90);
             }
         } else if (aimState == AIM_HOLDING) {
             aimState = AIM_NONE;
@@ -720,45 +707,11 @@ public class GamepadOverlay extends View {
 
     private void aimReset() {
         handler.removeCallbacks(aimHold);
-        glideToken++;
         aimState = AIM_NONE;
         if (aimTriggerDown) {
             aimTriggerDown = false;
             nativeAxis(RIGHT_TRIGGER, AXIS_MIN);
         }
-    }
-
-    /**
-     * Turns the camera so that the point (x, y) of the screen ends up under the crosshair (the screen's
-     * centre), as relative mouse movement in small steps so the turn looks smooth, then runs done. The
-     * angles come from the field of view: a point dx right and dy below the centre, with the focal length
-     * f = (height / 2) / tan(fov / 2), is yaw = atan(dx / f) away and pitch = atan(dy / hypot(dx, f)).
-     */
-    private void glideTo(float x, float y, Runnable done) {
-        float w = getWidth(), h = getHeight();
-        double dx = x - w / 2f, dy = y - h / 2f;
-        double f = (h / 2.0) / Math.tan(Math.toRadians(fovDegrees) / 2);
-        double yaw = Math.toDegrees(Math.atan2(dx, f));
-        double pitch = Math.toDegrees(Math.atan(dy / Math.hypot(dx, f)));
-        int cx = (int) Math.round(yaw / DEG_PER_COUNT * aimScale);
-        int cy = (int) Math.round(pitch / DEG_PER_COUNT * aimScale);
-        int steps = Math.max(1, (int) Math.ceil(Math.max(Math.abs(cx), Math.abs(cy)) / 40.0));
-        int token = ++glideToken;
-        if (debug)
-            Log.v(TAG, "aim at " + (int) x + "," + (int) y + " yaw=" + (int) yaw + " pitch=" + (int) pitch
-                + " counts=" + cx + "," + cy + " steps=" + steps + " fov=" + fovDegrees);
-        for (int i = 0; i < steps; i++) {
-            final int sx = Math.round((float) cx * (i + 1) / steps) - Math.round((float) cx * i / steps);
-            final int sy = Math.round((float) cy * (i + 1) / steps) - Math.round((float) cy * i / steps);
-            handler.postDelayed(() -> {
-                if (token == glideToken)
-                    nativeMouseMove(sx, sy);
-            }, i * 8L);
-        }
-        handler.postDelayed(() -> {
-            if (token == glideToken)
-                done.run();
-        }, steps * 8L + 40);
     }
 
     private void moveStick(float x, float y) {
@@ -1072,12 +1025,37 @@ public class GamepadOverlay extends View {
             canvas.drawBitmap(c.bitmap, null, box, icon);
         } else if (isGear(c)) {
             drawSliders(canvas, x, y, r, c.down);
+        } else if (PADICON.equals(c.icon)) {
+            drawGamepadGlyph(canvas, x, y, r, c.down);
         } else if (!c.label.isEmpty()) {
             text.setColor(c.down ? ACCENT : LABEL);
             text.setTextAlign(Paint.Align.CENTER);
             text.setTextSize(r * 0.8f);
             canvas.drawText(c.label, x, y + r * 0.28f, text);
         }
+    }
+
+    // A game controller: the glyph of the button that shows and hides the controls. It dims when they are hidden.
+    private void drawGamepadGlyph(Canvas canvas, float x, float y, float r, boolean down) {
+        int ink = down ? ACCENT : GLYPH;
+        int alpha = enabled ? 255 : 150;
+        stroke.setColor(ink);
+        stroke.setAlpha(alpha);
+        stroke.setStrokeWidth(Math.max(2f, r * 0.09f));
+        fill.setColor(ink);
+        fill.setAlpha(alpha);
+        float w = r * 0.62f, h = r * 0.38f;
+        box.set(x - w, y - h, x + w, y + h);
+        canvas.drawRoundRect(box, h * 0.9f, h * 0.9f, stroke);
+        // D-pad on the left.
+        float arm = r * 0.17f, t = r * 0.055f;
+        canvas.drawRect(x - w * 0.55f - arm, y - t, x - w * 0.55f + arm, y + t, fill);
+        canvas.drawRect(x - w * 0.55f - t, y - arm, x - w * 0.55f + t, y + arm, fill);
+        // Two buttons on the right.
+        canvas.drawCircle(x + w * 0.38f, y - h * 0.2f, r * 0.065f, fill);
+        canvas.drawCircle(x + w * 0.6f, y + h * 0.25f, r * 0.065f, fill);
+        stroke.setAlpha(255);
+        fill.setAlpha(255);
     }
 
     // Three sliders: the glyph of the settings button, which has no bitmap.

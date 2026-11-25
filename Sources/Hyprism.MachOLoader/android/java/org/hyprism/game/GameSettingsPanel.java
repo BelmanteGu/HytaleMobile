@@ -106,28 +106,12 @@ final class GameSettingsPanel extends FrameLayout {
             "Antes de jogar um mundo novo, gera 1 km em volta de você para explorar depois ficar mais leve. Leva alguns minutos e dá para pular.",
             toggle(GameSettings.pregenerate(activity), on -> GameSettings.setPregenerate(activity, on)), false);
 
-        row("Tocar para mirar (estilo Bedrock)",
-            "Tocar num ponto da tela vira a câmera até ele e usa ou coloca; segurar quebra ou bate; arrastar mexe a câmera. O botão de bater e quebrar some, o de defender continua. O analógico fica no canto inferior esquerdo.",
+        row("Tocar na tela (estilo Bedrock)",
+            "A mira fica no centro da tela. Tocar em qualquer lugar usa ou coloca o item na mira; segurar quebra ou bate; arrastar mexe a câmera. O botão de bater e quebrar some, o de defender continua. O analógico fica no canto inferior esquerdo.",
             toggle(GameSettings.touchAim(activity), on -> {
                 GameSettings.setTouchAim(activity, on);
                 pad.reloadSettings();
             }), false);
-
-        SeekBar aim = new SeekBar(activity);
-        aim.setMax(150); // 50% to 200%
-        aim.setProgress(Math.round((GameSettings.aimScale(activity) - 0.5f) * 100));
-        aim.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
-                if (!fromUser)
-                    return;
-                GameSettings.setAimScale(activity, 0.5f + progress / 100f);
-                pad.reloadSettings();
-            }
-            @Override public void onStartTrackingTouch(SeekBar bar) { }
-            @Override public void onStopTrackingTouch(SeekBar bar) { }
-        });
-        row("Ajuste da mira por toque",
-            "Se a câmera gira de menos ao tocar, aumente; se passa do ponto, diminua.", aim, true);
 
         SeekBar size = new SeekBar(activity);
         size.setMax(100); // 60% to 160%
