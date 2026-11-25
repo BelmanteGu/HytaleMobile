@@ -19,7 +19,8 @@ folder, and the game starts its local world server with the Java runtime extract
       android:icon="@drawable/Icon"
       android:appCategory="game"
       android:hardwareAccelerated="true"
-      android:extractNativeLibs="true">
+      android:extractNativeLibs="true"
+      android:debuggable="true">
     <activity android:name="org.hyprism.game.SetupActivity"
         android:process=":game"
         android:exported="false"

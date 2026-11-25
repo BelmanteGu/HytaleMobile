@@ -626,15 +626,19 @@ public partial class InstanceRepository : IInstanceRepository
             var userDataPath = Path.Combine(folder, "UserData");
             bool hasUserData = Directory.Exists(userDataPath);
             long size = 0;
-            if (hasUserData)
+            // On Android the instance is the game's files folder on shared storage, where walking tens
+            // of thousands of files (the client bundle, worlds) takes minutes; sizes stay unknown there.
+            bool measure = !OperatingSystem.IsAndroid();
+            if (hasUserData && measure)
             {
                 try { size = new DirectoryInfo(userDataPath).EnumerateFiles("*", SearchOption.AllDirectories).Sum(fi => fi.Length); }
                 catch { }
             }
 
             long totalSize = 0;
-            try { totalSize = new DirectoryInfo(folder).EnumerateFiles("*", SearchOption.AllDirectories).Sum(fi => fi.Length); }
-            catch { }
+            if (measure)
+                try { totalSize = new DirectoryInfo(folder).EnumerateFiles("*", SearchOption.AllDirectories).Sum(fi => fi.Length); }
+                catch { }
 
             if (string.IsNullOrEmpty(instanceId))
             {
