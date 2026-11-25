@@ -71,8 +71,7 @@ public class SetupActivity extends Activity {
         worker.start();
     }
 
-    /** Launcher setting: the height the 3D view is drawn at (0: the game's own render scale). */
-    static final String RENDER_HEIGHT_EXTRA = "org.hyprism.game.RENDER_HEIGHT";
+    /** The height the 3D view is drawn at comes from the in-game panel (0: the game's own render scale). */
     private static final java.util.regex.Pattern RENDER_SCALE =
         java.util.regex.Pattern.compile("(\"RenderScale\"\\s*:\\s*)(\\d+)");
 
@@ -82,7 +81,7 @@ public class SetupActivity extends Activity {
      * setting returns to the game's.
      */
     private void applyRenderHeight() {
-        int height = getIntent() != null ? getIntent().getIntExtra(RENDER_HEIGHT_EXTRA, 0) : 0;
+        int height = GameSettings.renderHeight(this);
         java.io.File settings = new java.io.File(getExternalFilesDir(null), "UserData/Settings.json");
         java.io.File saved = new java.io.File(getFilesDir(), "renderscale.player");
         try {
@@ -117,15 +116,12 @@ public class SetupActivity extends Activity {
         }
     }
 
-    /** Launcher setting: pre-generate the land around the player in worlds made after it was turned on. */
-    static final String PREGENERATE_EXTRA = "org.hyprism.game.PREGENERATE_NEW_WORLDS";
-
     /**
      * A world created since the setting was on that has not been pre-generated (or skipped). The first
      * time, every existing world is marked done: only new worlds are pre-generated.
      */
     private java.io.File worldToPregenerate() {
-        if (getIntent() == null || !getIntent().getBooleanExtra(PREGENERATE_EXTRA, false))
+        if (!GameSettings.pregenerate(this))
             return null;
         java.io.File[] saves = new java.io.File(getExternalFilesDir(null), "UserData/Saves").listFiles();
         if (saves == null)

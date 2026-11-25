@@ -3138,34 +3138,4 @@ Você pode precisar reinstalar o jogo se trocar de unidade</value>
   <data name="instances.worlds.deleteHint" xml:space="preserve">
     <value>Excluir "{0}" e todos os dados deste mundo? Esta ação não pode ser desfeita</value>
   </data>
-  <data name="settings.phone.title" xml:space="preserve">
-    <value>Celular</value>
-  </data>
-  <data name="settings.phone.batterySaver" xml:space="preserve">
-    <value>Modo bateria</value>
-  </data>
-  <data name="settings.phone.batterySaverHint" xml:space="preserve">
-    <value>Joga a uns 45 FPS (30 se a tela não tiver esse modo) em vez de 60: esquenta e gasta menos bateria</value>
-  </data>
-  <data name="settings.phone.halfTextures" xml:space="preserve">
-    <value>Texturas mais leves</value>
-  </data>
-  <data name="settings.phone.halfTexturesHint" xml:space="preserve">
-    <value>Carrega as texturas grandes pela metade: menos memória de vídeo, um pouco menos nítido de perto</value>
-  </data>
-  <data name="settings.phone.pregenerate" xml:space="preserve">
-    <value>Pré-gerar mundos novos</value>
-  </data>
-  <data name="settings.phone.pregenerateHint" xml:space="preserve">
-    <value>Antes de jogar um mundo novo, gera 1 km em volta de você para explorar depois ficar mais leve. Leva alguns minutos e dá para pular</value>
-  </data>
-  <data name="settings.phone.resolution" xml:space="preserve">
-    <value>Resolução do 3D</value>
-  </data>
-  <data name="settings.phone.resolutionHint" xml:space="preserve">
-    <value>Desenha o mundo do jogo nessa altura e estica para a tela; menus continuam nítidos. Menor é mais leve, bom para celulares fracos</value>
-  </data>
-  <data name="settings.phone.resolutionDefault" xml:space="preserve">
-    <value>Do jogo</value>
-  </data>
 </root>

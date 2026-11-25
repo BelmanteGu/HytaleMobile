@@ -35,6 +35,13 @@ folder, and the game starts its local world server with the Java runtime extract
         android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
         android:configChanges="layoutDirection|locale|grammaticalGender|fontScale|fontWeightAdjustment|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation"
         android:preferMinimalPostProcessing="true" />
+    <!-- Restarts the game from the in-game settings panel; its own process, so it can end the game's. -->
+    <activity android:name="org.hyprism.game.RestartActivity"
+        android:process=":restart"
+        android:exported="false"
+        android:excludeFromRecents="true"
+        android:screenOrientation="sensorLandscape"
+        android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen" />
     <!-- Started by the launcher's "Pre-generate world" instance action. -->
     <activity android:name="org.hyprism.game.PregenerateActivity"
         android:process=":game"

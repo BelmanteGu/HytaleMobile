@@ -325,6 +325,23 @@ static bool w_GL_SetSwapInterval(int interval)
     return real_SDL_GL_SetSwapInterval(interval);
 }
 
+// HYPRISM_CONTENT_SCALE=<x> makes SDL_GetDisplayContentScale answer x. The client imports it and keeps
+// a UiScale of its own; this is a way to see whether the interface follows the display's content scale
+// (an experiment for a larger HUD, off by default).
+static float w_GetDisplayContentScale(SDL_DisplayID display)
+{
+    REAL(SDL_GetDisplayContentScale);
+    const char *env = getenv("HYPRISM_CONTENT_SCALE");
+    float real = real_SDL_GetDisplayContentScale(display);
+    if (env && atof(env) > 0) {
+        static int logged;
+        if (!logged++)
+            macho_log("sdl", "display content scale %.2f reported as %.2f (HYPRISM_CONTENT_SCALE)", real, atof(env));
+        return (float)atof(env);
+    }
+    return real;
+}
+
 void *sdl_scale_lookup(void *sdl_handle, const char *symbol)
 {
     if (!g_sdl) {
@@ -341,6 +358,8 @@ void *sdl_scale_lookup(void *sdl_handle, const char *symbol)
         return (void *)w_GL_SetSwapInterval;
     if (strcmp(symbol, "SDL_GL_SwapWindow") == 0 && (getenv("HYPRISM_PERF") || getenv("HYPRISM_GPU_PROFILE")))
         return (void *)w_GL_SwapWindow;
+    if (strcmp(symbol, "SDL_GetDisplayContentScale") == 0 && getenv("HYPRISM_CONTENT_SCALE"))
+        return (void *)w_GetDisplayContentScale;
     if (g_scale == 1.0f)
         return NULL;
     for (size_t i = 0; i < SHIM_COUNT(k_wrappers); i++)

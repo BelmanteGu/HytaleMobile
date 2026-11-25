@@ -3,6 +3,7 @@
 
 package org.hyprism.game;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.util.Log;
@@ -28,11 +29,8 @@ public class HytaleActivity extends SDLActivity {
     static final String ARGUMENTS_EXTRA = "org.hyprism.game.ARGUMENTS";
     /** The launcher instance to run; libmain.so reads it as HYPRISM_GAME_DIR (default: the files folder). */
     static final String GAME_DIR_EXTRA = "org.hyprism.game.GAME_DIR";
-    /** Launcher setting: a lower frame rate for less heat and battery. */
-    static final String BATTERY_SAVER_EXTRA = "org.hyprism.game.BATTERY_SAVER";
-    /** Launcher setting: large textures at half size (HYPRISM_TEXTURE_HALF). */
-    static final String HALF_TEXTURES_EXTRA = "org.hyprism.game.HALF_TEXTURES";
     private boolean batterySaver;
+    private GameSettingsPanel settingsPanel;
     private static volatile boolean running;
 
     /** Whether the game is open, so the world must not be pre-generated now. */
@@ -51,9 +49,10 @@ public class HytaleActivity extends SDLActivity {
         } catch (android.system.ErrnoException e) {
             Log.w("HytaleHost", "could not pass the game folder: " + e);
         }
-        batterySaver = getIntent() != null && getIntent().getBooleanExtra(BATTERY_SAVER_EXTRA, false);
-        boolean halfTextures = getIntent() != null && getIntent().getBooleanExtra(HALF_TEXTURES_EXTRA, false);
-        setEnv("HYPRISM_TEXTURE_HALF", halfTextures ? "1" : null);
+        // The phone options come from the in-game panel (GameSettingsPanel).
+        GameSettings.snapshot(this);
+        batterySaver = GameSettings.batterySaver(this);
+        setEnv("HYPRISM_TEXTURE_HALF", GameSettings.halfTextures(this) ? "1" : null);
         setEnv("HYPRISM_SWAP_INTERVAL", null);
         super.onCreate(savedInstanceState);
         running = true;
@@ -71,6 +70,38 @@ public class HytaleActivity extends SDLActivity {
         addContentView(gamepad, new ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         gamepad.postDelayed(gamepad::restore, 15000);
+
+        // The settings panel sits above the controls; the gear in their top bar opens it.
+        settingsPanel = new GameSettingsPanel(this, gamepad);
+        addContentView(settingsPanel, new ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        gamepad.setOnOpenSettings(settingsPanel::show);
+    }
+
+    /**
+     * Restarts the game, to apply the options that are read at start. RestartActivity (another process)
+     * stops the world server so it saves, ends this process and starts SetupActivity again with the same
+     * extras, which carry the account's session.
+     */
+    void restartGame() {
+        Intent next = new Intent(this, SetupActivity.class);
+        if (getIntent() != null && getIntent().getExtras() != null)
+            next.putExtras(getIntent().getExtras());
+        next.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        Intent restart = new Intent(this, RestartActivity.class);
+        restart.putExtra(RestartActivity.PID_EXTRA, android.os.Process.myPid());
+        restart.putExtra(RestartActivity.NEXT_EXTRA, next);
+        restart.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(restart);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (settingsPanel != null && settingsPanel.isOpen()) {
+            settingsPanel.hide();
+            return;
+        }
+        super.onBackPressed();
     }
 
     /**

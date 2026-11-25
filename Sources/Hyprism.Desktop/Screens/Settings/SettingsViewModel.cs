@@ -103,10 +103,6 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     [ObservableProperty] private SettingChoiceViewModel _selectedGpuPreference;
     private readonly IReadOnlyList<GpuAdapterInfo> _detectedGpuAdapters = [];
     [ObservableProperty] private bool _showAlphaMods;
-    [ObservableProperty] private bool _phoneBatterySaver;
-    [ObservableProperty] private bool _phoneHalfTextures;
-    [ObservableProperty] private bool _phonePregenerateNewWorlds;
-    [ObservableProperty] private SettingChoiceViewModel? _selectedPhoneResolution;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsAuthServerVisible))]
     private bool _onlineMode;
@@ -289,14 +285,6 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         _selectedTheme.IsSelected = true;
         _selectedGpuPreference = ResolveGpuChoice(settings.GpuPreference);
         _showAlphaMods = settings.ShowAlphaMods;
-        _phoneBatterySaver = settings.PhoneBatterySaver;
-        _phoneHalfTextures = settings.PhoneHalfTextures;
-        _phonePregenerateNewWorlds = settings.PhonePregenerateNewWorlds;
-        PhoneResolutions = new ObservableCollection<SettingChoiceViewModel>(
-            new[] { "0", "540", "480", "360", "240" }.Select(h =>
-                new SettingChoiceViewModel(h, h == "0" ? localizer["settings.phone.resolutionDefault"] : h + "p")));
-        _selectedPhoneResolution = PhoneResolutions.FirstOrDefault(c => c.Value == settings.PhoneRenderHeight.ToString())
-            ?? PhoneResolutions[0];
         _onlineMode = settings.OnlineMode;
         _useCustomJava = settings.UseCustomJava;
         _authDomain = ResolveAuthServer(settings.AuthDomain);
@@ -424,19 +412,6 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     public string LanguageHint { get; private set; } = string.Empty;
     public string AlphaModsLabel { get; private set; } = string.Empty;
     public string AlphaModsHint { get; private set; } = string.Empty;
-    /// <summary>Whether the phone game options are shown (Android only)</summary>
-    public bool IsPhone => OperatingSystem.IsAndroid();
-    public string PhoneTitle { get; private set; } = string.Empty;
-    public string PhoneBatterySaverLabel { get; private set; } = string.Empty;
-    public string PhoneBatterySaverHint { get; private set; } = string.Empty;
-    public string PhoneHalfTexturesLabel { get; private set; } = string.Empty;
-    public string PhoneHalfTexturesHint { get; private set; } = string.Empty;
-    public string PhonePregenerateLabel { get; private set; } = string.Empty;
-    public string PhonePregenerateHint { get; private set; } = string.Empty;
-    public string PhoneResolutionLabel { get; private set; } = string.Empty;
-    public string PhoneResolutionHint { get; private set; } = string.Empty;
-    /// <summary>The 3D view heights offered on Android</summary>
-    public ObservableCollection<SettingChoiceViewModel> PhoneResolutions { get; }
     public string DownloadsInfo { get; private set; } = string.Empty;
     public string DownloadsNoteTitle { get; private set; } = string.Empty;
     public string DownloadSourcesTitle { get; private set; } = string.Empty;
@@ -585,15 +560,6 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         LanguageHint = _localizer["settings.languageSettings.interfaceLanguageHint"];
         AlphaModsLabel = _localizer["settings.generalSettings.showAlphaMods"];
         AlphaModsHint = _localizer["settings.generalSettings.showAlphaModsHint"];
-        PhoneTitle = _localizer["settings.phone.title"];
-        PhoneBatterySaverLabel = _localizer["settings.phone.batterySaver"];
-        PhoneBatterySaverHint = _localizer["settings.phone.batterySaverHint"];
-        PhoneHalfTexturesLabel = _localizer["settings.phone.halfTextures"];
-        PhoneHalfTexturesHint = _localizer["settings.phone.halfTexturesHint"];
-        PhonePregenerateLabel = _localizer["settings.phone.pregenerate"];
-        PhonePregenerateHint = _localizer["settings.phone.pregenerateHint"];
-        PhoneResolutionLabel = _localizer["settings.phone.resolution"];
-        PhoneResolutionHint = _localizer["settings.phone.resolutionHint"];
         DownloadsInfo = _localizer["settings.downloads.howDownloadsWorkDescription"];
         DownloadsNoteTitle = _localizer["common.note"];
         DownloadSourcesTitle = _localizer["settings.downloads.sources"];
@@ -795,14 +761,6 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         DesktopTheme.ApplyAccent(color.Id);
     }
     partial void OnShowAlphaModsChanged(bool value) => _settings.ShowAlphaMods = value;
-    partial void OnPhoneBatterySaverChanged(bool value) => _settings.PhoneBatterySaver = value;
-    partial void OnPhoneHalfTexturesChanged(bool value) => _settings.PhoneHalfTextures = value;
-    partial void OnPhonePregenerateNewWorldsChanged(bool value) => _settings.PhonePregenerateNewWorlds = value;
-    partial void OnSelectedPhoneResolutionChanged(SettingChoiceViewModel? value)
-    {
-        if (value is not null && int.TryParse(value.Value, out var height))
-            _settings.PhoneRenderHeight = height;
-    }
     partial void OnOnlineModeChanged(bool value)
     {
         _settings.OnlineMode = value;

@@ -111,6 +111,8 @@ public class GamepadOverlay extends View {
         tile("hud_clock", 0.5000f, 0.63f, DPAD_UP, false),
         tile("hud_eye", 0.6113f, 0.76f, -1, true),
         tile("hud_addplayer", 0.7212f, 0.74f, DPAD_RIGHT, false),
+        // The gear opens the phone settings panel (GameSettingsPanel); it has no gamepad button.
+        tile(GEAR, 0.8312f, 0.62f, -1, false),
         // Left side. The stick pad is drawn by drawStick.
         octagon("hud_sprint", EDGE_LEFT, 0.1010f, 0.2273f, 0.1422f, 0.48f, LEFT_STICK, -1),
         octagon("hud_shield", EDGE_LEFT, 0.1909f, 0.3558f, 0.1422f, 0.52f, -1, LEFT_TRIGGER),
@@ -134,6 +136,8 @@ public class GamepadOverlay extends View {
         PAD_FILL = 0x54141409, PAD_EDGE = 0x40140C00, KNOB_RING = 0xF2EDD2A2, KNOB_FILL = 0xE6D69F41,
         GLYPH = 0xFFC3CCDF, LABEL = 0xFFC3CCDF, ACCENT = 0xFFF2B33D;
 
+    private static final String GEAR = "sliders";
+    private static final int ROLE_GEAR = -8;
     private static final int ROLE_STICK = -2, ROLE_LOOK = -3, ROLE_TOGGLE = -4, ROLE_EDIT = -5, ROLE_HOTBAR = -6,
         ROLE_NONE = -7;
     // Pushing the stick this far past its ring sprints (holds L3): no second thumb needed to run.
@@ -142,6 +146,8 @@ public class GamepadOverlay extends View {
     // character keeps sprinting forward on its own, so the thumb is free for the camera. A new touch on
     // the stick side, the padlock or the sprint button gives control back.
     private static final float LOCK_AT = 1.9f, LOCK_CONE = 0.5f;
+    private Runnable onOpenSettings;
+    private float controlScale = 1f;
     private boolean sprinting, runLocked, inLockZone;
     private float knobDX, knobDY;
     private static final String TAG = "HytalePad";
@@ -207,6 +213,7 @@ public class GamepadOverlay extends View {
     public GamepadOverlay(Context context) {
         super(context);
         prefs = context.getSharedPreferences("gamepad", Context.MODE_PRIVATE);
+        controlScale = GameSettings.controlSize(context);
         loadLayout();
         stroke.setStyle(Paint.Style.STROKE);
         stroke.setStrokeWidth(2 * getResources().getDisplayMetrics().density);
@@ -249,7 +256,44 @@ public class GamepadOverlay extends View {
 
     // The eye also stays while the pad is off, so it can be turned back on.
     private boolean visible(Control c) {
-        return c.toggle ? !physical && (!enabled || inGame || editing) : live();
+        return c.toggle || isGear(c) ? !physical && (!enabled || inGame || editing) : live();
+    }
+
+    private static boolean isGear(Control c) {
+        return GEAR.equals(c.icon);
+    }
+
+    private Control gear() {
+        for (Control c : controls)
+            if (isGear(c))
+                return c;
+        return null;
+    }
+
+    void setOnOpenSettings(Runnable open) {
+        onOpenSettings = open;
+    }
+
+    /** The panel is open: let go of everything the fingers were holding. */
+    void panelOpened() {
+        releaseAll();
+    }
+
+    void panelClosed() {
+        reloadSettings();
+    }
+
+    /** Picks up the control size set in the panel. */
+    void reloadSettings() {
+        controlScale = GameSettings.controlSize(getContext());
+        invalidate();
+    }
+
+    /** Opens the layout editor (from the panel), turning the pad on first if it was off. */
+    void startEditor() {
+        if (!enabled)
+            setGamepadEnabled(true);
+        setEditing(true);
     }
 
     private void refreshPhysical() {
@@ -307,7 +351,9 @@ public class GamepadOverlay extends View {
     }
 
     private float cy(Control c) { return c.fy * getHeight(); }
-    private float half(Control c) { return c.side * getHeight() / 2; }
+    private float half(Control c) {
+        return c.side * getHeight() * (c.shape == TILE_SHAPE ? 1f : controlScale) / 2;
+    }
 
     // Dragging a control in the editor stores its new centre in the same edge-relative units.
     private void moveTo(Control c, float x, float y) {
@@ -342,10 +388,17 @@ public class GamepadOverlay extends View {
             return editTouch(action, id, x, y, e);
 
         if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
-            if (onToggle(x, y)) {
+            Control top = hit(x, y);
+            if (top != null && top.toggle) {
                 roles.put(id, ROLE_TOGGLE);
                 if (live())
                     handler.postDelayed(enterEditor, 600);
+                return true;
+            }
+            if (top != null && isGear(top)) {
+                roles.put(id, ROLE_GEAR);
+                top.down = true;
+                invalidate();
                 return true;
             }
             if (!live())
@@ -425,7 +478,8 @@ public class GamepadOverlay extends View {
             if (role != null && role == ROLE_TOGGLE)
                 handler.removeCallbacks(enterEditor);
             if (role != null && !editing)
-                release(role, action == MotionEvent.ACTION_CANCEL ? false : onToggle(x, y));
+                release(role, action == MotionEvent.ACTION_CANCEL ? false : onToggle(x, y),
+                    action != MotionEvent.ACTION_CANCEL && overGear(x, y));
             if (lookPointer == id) {
                 lookPointer = -1;
                 handler.removeCallbacks(lookStop);
@@ -471,6 +525,8 @@ public class GamepadOverlay extends View {
 
     private void press(Control c, boolean down) {
         c.down = down;
+        if (isGear(c))
+            return; // no gamepad button behind it
         if (c.axis >= 0) {
             nativeAxis(c.axis, down ? AXIS_MAX : AXIS_MIN);
         } else if (c.chord) {
@@ -487,10 +543,21 @@ public class GamepadOverlay extends View {
         }
     }
 
-    private void release(int role, boolean onToggle) {
+    private boolean overGear(float x, float y) {
+        Control c = hit(x, y);
+        return c != null && isGear(c);
+    }
+
+    private void release(int role, boolean onToggle, boolean onGear) {
         if (role == ROLE_TOGGLE) {
             if (onToggle)
                 setGamepadEnabled(!enabled);
+        } else if (role == ROLE_GEAR) {
+            Control g = gear();
+            if (g != null)
+                g.down = false;
+            if (onGear && onOpenSettings != null)
+                onOpenSettings.run();
         } else if (role == ROLE_STICK) {
             stickActive = false;
             if (inLockZone) {
@@ -826,12 +893,31 @@ public class GamepadOverlay extends View {
             icon.setColorFilter(c.down ? accentTint : c.tint ? glyphTint : null);
             icon.setAlpha(c.toggle && !enabled ? 150 : 255);
             canvas.drawBitmap(c.bitmap, null, box, icon);
+        } else if (isGear(c)) {
+            drawSliders(canvas, x, y, r, c.down);
         } else if (!c.label.isEmpty()) {
             text.setColor(c.down ? ACCENT : LABEL);
             text.setTextAlign(Paint.Align.CENTER);
             text.setTextSize(r * 0.8f);
             canvas.drawText(c.label, x, y + r * 0.28f, text);
         }
+    }
+
+    // Three sliders: the glyph of the settings button, which has no bitmap.
+    private void drawSliders(Canvas canvas, float x, float y, float r, boolean down) {
+        int ink = down ? ACCENT : GLYPH;
+        stroke.setColor(ink);
+        stroke.setStrokeWidth(Math.max(2f, r * 0.09f));
+        stroke.setStrokeCap(Paint.Cap.ROUND);
+        fill.setColor(ink);
+        float w = r * 0.58f;
+        float[] ys = { -0.34f * r, 0f, 0.34f * r };
+        float[] ks = { -0.30f, 0.34f, -0.04f };
+        for (int i = 0; i < 3; i++) {
+            canvas.drawLine(x - w, y + ys[i], x + w, y + ys[i], stroke);
+            canvas.drawCircle(x + ks[i] * w * 1.6f, y + ys[i], r * 0.13f, fill);
+        }
+        stroke.setStrokeCap(Paint.Cap.BUTT);
     }
 
     // A translucent square with a pixel-stepped diamond as the knob. The pad stays where it is; the
