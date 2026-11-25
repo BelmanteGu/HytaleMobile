@@ -12,7 +12,7 @@ namespace Hyprism.Desktop.Android;
 /// Hands authenticated launches to the game half of this app, which runs the macOS arm64 client
 /// through the Hyprism Mach-O loader in its own process.
 /// </summary>
-internal sealed class AndroidGameHost : IExternalGameHost
+internal sealed class AndroidGameHost(Hyprism.Core.Infrastructure.IConfigStore configStore) : IExternalGameHost
 {
     // SetupActivity prepares the world server, then opens HytaleActivity with these arguments.
     internal const string SetupActivity = "org.hyprism.game.SetupActivity";
@@ -33,6 +33,11 @@ internal sealed class AndroidGameHost : IExternalGameHost
         // The game runs the instance it is given; the default instance is a link to its files folder.
         var target = new DirectoryInfo(gameDirectory).ResolveLinkTarget(returnFinalTarget: true)?.FullName;
         intent.PutExtra(GameDirectoryExtra, target ?? gameDirectory);
+        // The phone options from the launcher's settings.
+        var config = configStore.Configuration;
+        intent.PutExtra("org.hyprism.game.BATTERY_SAVER", config.PhoneBatterySaver);
+        intent.PutExtra("org.hyprism.game.HALF_TEXTURES", config.PhoneHalfTextures);
+        intent.PutExtra("org.hyprism.game.PREGENERATE_NEW_WORLDS", config.PhonePregenerateNewWorlds);
         intent.AddFlags(ActivityFlags.NewTask | ActivityFlags.ClearTop);
         context.StartActivity(intent);
         return Task.CompletedTask;

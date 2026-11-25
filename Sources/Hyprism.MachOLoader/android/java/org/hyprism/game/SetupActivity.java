@@ -52,7 +52,13 @@ public class SetupActivity extends Activity {
         Thread worker = new Thread(() -> {
             try {
                 setup.run();
-                runOnUiThread(this::startGame);
+                java.io.File world = worldToPregenerate();
+                runOnUiThread(() -> {
+                    if (world != null)
+                        pregenerate(world);
+                    else
+                        startGame();
+                });
             } catch (Exception e) {
                 Log.e("HytaleSetup", "setup failed", e);
                 runOnUiThread(() -> {
@@ -62,6 +68,51 @@ public class SetupActivity extends Activity {
             }
         }, "HytaleSetup");
         worker.start();
+    }
+
+    /** Launcher setting: pre-generate the land around the player in worlds made after it was turned on. */
+    static final String PREGENERATE_EXTRA = "org.hyprism.game.PREGENERATE_NEW_WORLDS";
+
+    /**
+     * A world created since the setting was on that has not been pre-generated (or skipped). The first
+     * time, every existing world is marked done: only new worlds are pre-generated.
+     */
+    private java.io.File worldToPregenerate() {
+        if (getIntent() == null || !getIntent().getBooleanExtra(PREGENERATE_EXTRA, false))
+            return null;
+        java.io.File[] saves = new java.io.File(getExternalFilesDir(null), "UserData/Saves").listFiles();
+        if (saves == null)
+            return null;
+        java.io.File baseline = new java.io.File(getFilesDir(), "pregenerate.baseline");
+        boolean first = !baseline.exists();
+        java.io.File pick = null;
+        for (java.io.File save : saves) {
+            boolean played = new java.io.File(save, "universe/worlds/default/config.json").isFile()
+                && new java.io.File(save, "universe/players").isDirectory();
+            if (!played || new java.io.File(save, PregenerateActivity.MARKER).exists())
+                continue;
+            if (first)
+                PregenerateActivity.mark(save);
+            else if (pick == null || save.lastModified() > pick.lastModified())
+                pick = save;
+        }
+        if (first)
+            try {
+                baseline.createNewFile();
+            } catch (java.io.IOException e) {
+                Log.w("HytaleSetup", "could not record the pre-generation baseline: " + e);
+            }
+        return pick;
+    }
+
+    private void pregenerate(java.io.File world) {
+        Intent pregen = new Intent(this, PregenerateActivity.class);
+        if (getIntent() != null && getIntent().getExtras() != null)
+            pregen.putExtras(getIntent().getExtras());
+        pregen.putExtra(PregenerateActivity.AUTO_EXTRA, true);
+        pregen.putExtra(PregenerateActivity.WORLD_EXTRA, world.getPath());
+        startActivity(pregen);
+        finish();
     }
 
     private void startGame() {

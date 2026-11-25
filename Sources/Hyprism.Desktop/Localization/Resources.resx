@@ -3147,4 +3147,25 @@ You may need to reinstall the game if switching drives</value>
   <data name="instances.worlds.deleteHint" xml:space="preserve">
     <value>Delete "{0}" and all of this world's data? This action cannot be undone</value>
   </data>
+  <data name="settings.phone.title" xml:space="preserve">
+    <value>Phone</value>
+  </data>
+  <data name="settings.phone.batterySaver" xml:space="preserve">
+    <value>Battery mode</value>
+  </data>
+  <data name="settings.phone.batterySaverHint" xml:space="preserve">
+    <value>Plays at about 45 FPS (30 where the screen has no such mode) instead of 60: less heat and battery</value>
+  </data>
+  <data name="settings.phone.halfTextures" xml:space="preserve">
+    <value>Lighter textures</value>
+  </data>
+  <data name="settings.phone.halfTexturesHint" xml:space="preserve">
+    <value>Loads large textures at half size: less video memory, slightly softer up close</value>
+  </data>
+  <data name="settings.phone.pregenerate" xml:space="preserve">
+    <value>Pre-generate new worlds</value>
+  </data>
+  <data name="settings.phone.pregenerateHint" xml:space="preserve">
+    <value>Before playing a new world, generates 1 km around you so exploring it later is lighter. Takes a few minutes; it can be skipped</value>
+  </data>
 </root>

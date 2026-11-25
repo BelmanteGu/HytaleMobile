@@ -33,6 +33,23 @@ SPDX-License-Identifier: GPL-3.0-only
                 </Border>
               </StackPanel>
 
+              <StackPanel Spacing="10" IsVisible="{Binding IsPhone}">
+                <TextBlock Text="{Binding PhoneTitle}" Classes="settingsCategoryHeading" />
+                <Border Classes="formGroup">
+                  <StackPanel>
+                    <controls:FormRow Label="{Binding PhoneBatterySaverLabel}" Hint="{Binding PhoneBatterySaverHint}">
+                      <ToggleSwitch Classes="uiToggle" IsChecked="{Binding PhoneBatterySaver}" />
+                    </controls:FormRow>
+                    <controls:FormRow Label="{Binding PhoneHalfTexturesLabel}" Hint="{Binding PhoneHalfTexturesHint}">
+                      <ToggleSwitch Classes="uiToggle" IsChecked="{Binding PhoneHalfTextures}" />
+                    </controls:FormRow>
+                    <controls:FormRow Classes="last" Label="{Binding PhonePregenerateLabel}" Hint="{Binding PhonePregenerateHint}">
+                      <ToggleSwitch Classes="uiToggle" IsChecked="{Binding PhonePregenerateNewWorlds}" />
+                    </controls:FormRow>
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+
               <StackPanel Spacing="10">
                 <TextBlock Text="{Binding GpuLabel}" Classes="settingsCategoryHeading" />
                 <Border Classes="formGroup">

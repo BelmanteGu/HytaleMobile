@@ -28,6 +28,11 @@ public class HytaleActivity extends SDLActivity {
     static final String ARGUMENTS_EXTRA = "org.hyprism.game.ARGUMENTS";
     /** The launcher instance to run; libmain.so reads it as HYPRISM_GAME_DIR (default: the files folder). */
     static final String GAME_DIR_EXTRA = "org.hyprism.game.GAME_DIR";
+    /** Launcher setting: a lower frame rate for less heat and battery. */
+    static final String BATTERY_SAVER_EXTRA = "org.hyprism.game.BATTERY_SAVER";
+    /** Launcher setting: large textures at half size (HYPRISM_TEXTURE_HALF). */
+    static final String HALF_TEXTURES_EXTRA = "org.hyprism.game.HALF_TEXTURES";
+    private boolean batterySaver;
     private static volatile boolean running;
 
     /** Whether the game is open, so the world must not be pre-generated now. */
@@ -46,6 +51,10 @@ public class HytaleActivity extends SDLActivity {
         } catch (android.system.ErrnoException e) {
             Log.w("HytaleHost", "could not pass the game folder: " + e);
         }
+        batterySaver = getIntent() != null && getIntent().getBooleanExtra(BATTERY_SAVER_EXTRA, false);
+        boolean halfTextures = getIntent() != null && getIntent().getBooleanExtra(HALF_TEXTURES_EXTRA, false);
+        setEnv("HYPRISM_TEXTURE_HALF", halfTextures ? "1" : null);
+        setEnv("HYPRISM_SWAP_INTERVAL", null);
         super.onCreate(savedInstanceState);
         running = true;
         clearLeftoverPregeneration();
@@ -87,7 +96,9 @@ public class HytaleActivity extends SDLActivity {
         } catch (NumberFormatException e) {
             Log.w("HytaleHost", "ignoring a bad HYPRISM_REFRESH: " + e.getMessage());
         }
-        if (hz > 0) {
+        if (batterySaver)
+            applyBatterySaver();
+        else if (hz > 0) {
             WindowManager.LayoutParams attributes = getWindow().getAttributes();
             attributes.preferredRefreshRate = hz;
             getWindow().setAttributes(attributes);
@@ -105,6 +116,48 @@ public class HytaleActivity extends SDLActivity {
                 Toast.makeText(this, "The phone is hot and slowing down. Let it cool for a moment.",
                     Toast.LENGTH_SHORT).show();
         });
+    }
+
+    /**
+     * Battery mode: a display mode between 40 and 50 Hz when the panel has one (VSync then paces the
+     * game there, smoothly), otherwise every other refresh of a 60 Hz mode, 30 FPS.
+     */
+    private void applyBatterySaver() {
+        android.view.Display display = getWindowManager().getDefaultDisplay();
+        android.view.Display.Mode current = display.getMode();
+        android.view.Display.Mode best = null, sixty = null;
+        for (android.view.Display.Mode mode : display.getSupportedModes()) {
+            if (mode.getPhysicalWidth() != current.getPhysicalWidth() || mode.getPhysicalHeight() != current.getPhysicalHeight())
+                continue;
+            float rate = mode.getRefreshRate();
+            if (rate >= 40 && rate <= 50 && (best == null || rate < best.getRefreshRate()))
+                best = mode;
+            if (Math.abs(rate - 60) < 1)
+                sixty = mode;
+        }
+        WindowManager.LayoutParams attributes = getWindow().getAttributes();
+        if (best != null) {
+            attributes.preferredDisplayModeId = best.getModeId();
+            Log.i("HytaleHost", "battery mode: display at " + best.getRefreshRate() + " Hz");
+        } else {
+            if (sixty != null)
+                attributes.preferredDisplayModeId = sixty.getModeId();
+            attributes.preferredRefreshRate = 60f;
+            setEnv("HYPRISM_SWAP_INTERVAL", "2");
+            Log.i("HytaleHost", "battery mode: 30 FPS (no display mode near 45 Hz)");
+        }
+        getWindow().setAttributes(attributes);
+    }
+
+    private static void setEnv(String name, String value) {
+        try {
+            if (value != null)
+                android.system.Os.setenv(name, value, true);
+            else
+                android.system.Os.unsetenv(name);
+        } catch (android.system.ErrnoException e) {
+            Log.w("HytaleHost", "could not set " + name + ": " + e);
+        }
     }
 
     /** Brings files/java up to date when the game is opened without SetupActivity (adb, old shortcuts). */

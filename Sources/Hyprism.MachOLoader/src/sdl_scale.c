@@ -239,6 +239,15 @@ static bool w_GL_SetSwapInterval(int interval)
             macho_log("sdl", "forcing VSync on (the client asked for an uncapped frame rate)");
         interval = 1;
     }
+    // HYPRISM_SWAP_INTERVAL=2 presents every other refresh (30 FPS on a 60 Hz panel): the battery
+    // mode on a display without a mode near 45 Hz.
+    const char *every = getenv("HYPRISM_SWAP_INTERVAL");
+    if (every && atoi(every) >= 1 && interval != 0) {
+        static int logged;
+        if (!logged++)
+            macho_log("sdl", "presenting every %d display refreshes (HYPRISM_SWAP_INTERVAL)", atoi(every));
+        interval = atoi(every);
+    }
     return real_SDL_GL_SetSwapInterval(interval);
 }
 

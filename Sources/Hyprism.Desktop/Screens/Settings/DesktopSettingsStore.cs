@@ -219,6 +219,27 @@ public sealed class DesktopSettingsStore : IDesktopSettingsStore
         set => Save(config => config.ShowAlphaMods = value);
     }
 
+    /// <inheritdoc/>
+    public bool PhoneBatterySaver
+    {
+        get => _configStore.Configuration.PhoneBatterySaver;
+        set => Save(config => config.PhoneBatterySaver = value);
+    }
+
+    /// <inheritdoc/>
+    public bool PhoneHalfTextures
+    {
+        get => _configStore.Configuration.PhoneHalfTextures;
+        set => Save(config => config.PhoneHalfTextures = value);
+    }
+
+    /// <inheritdoc/>
+    public bool PhonePregenerateNewWorlds
+    {
+        get => _configStore.Configuration.PhonePregenerateNewWorlds;
+        set => Save(config => config.PhonePregenerateNewWorlds = value);
+    }
+
     private void Save(Action<Hyprism.Core.Models.Config> update)
     {
         update(_configStore.Configuration);

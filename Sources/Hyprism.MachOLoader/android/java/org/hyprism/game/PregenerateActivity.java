@@ -44,6 +44,11 @@ import java.util.regex.Pattern;
  */
 public class PregenerateActivity extends Activity {
     private static final String TAG = "HytalePregen";
+    /** Started by SetupActivity for a new world: generate 1 km around the player, then open the game. */
+    static final String AUTO_EXTRA = "org.hyprism.game.PREGEN_AUTO";
+    static final String WORLD_EXTRA = "org.hyprism.game.PREGEN_WORLD";
+    /** A save that has been pre-generated (or skipped) has this file. */
+    static final String MARKER = ".hyprism-pregenerated";
     private static final Pattern PROGRESS = Pattern.compile("Pregenerated (\\d+)/(\\d+) chunks");
 
     private final Handler ui = new Handler(Looper.getMainLooper());
@@ -55,6 +60,8 @@ public class PregenerateActivity extends Activity {
     private volatile long lastProgressAt;
     private volatile int done, total;
     private volatile boolean stopping;
+    private boolean auto, skipped;
+    private File autoWorld;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -79,7 +86,7 @@ public class PregenerateActivity extends Activity {
         for (int side : new int[] { 1024, 2048, 4096 }) {
             Button b = new Button(this);
             b.setText((side / 1024) + " × " + (side / 1024) + " km");
-            b.setOnClickListener(v -> start(side / 2));
+            b.setOnClickListener(v -> start(side / 2, latestWorld()));
             sizes.addView(b);
         }
         root.addView(title);
@@ -89,6 +96,21 @@ public class PregenerateActivity extends Activity {
             ViewGroup.LayoutParams.WRAP_CONTENT));
         root.addView(detail);
         setContentView(root);
+
+        auto = getIntent() != null && getIntent().getBooleanExtra(AUTO_EXTRA, false);
+        if (auto) {
+            autoWorld = new File(getIntent().getStringExtra(WORLD_EXTRA));
+            sizes.setVisibility(android.view.View.GONE);
+            Button skip = new Button(this);
+            skip.setText("Pular e jogar");
+            skip.setOnClickListener(v -> skip());
+            root.addView(skip);
+            title.setText("Preparando o mundo novo");
+            detail.setText("Gerando 1 × 1 km em volta do personagem: explorar essa área depois fica bem mais leve. "
+                + "Leva alguns minutos. " + chargingHint());
+            start(512, autoWorld);
+            return;
+        }
 
         if (HytaleActivity.isRunning()) {
             status.setText("Feche o jogo antes: o mundo não pode estar aberto em dois lugares.");
@@ -126,6 +148,12 @@ public class PregenerateActivity extends Activity {
         return getExternalFilesDir(null);
     }
 
+    /** The instance folder with the server and assets (the launcher's choice, or the files folder). */
+    private File game() {
+        String dir = getIntent() != null ? getIntent().getStringExtra(HytaleActivity.GAME_DIR_EXTRA) : null;
+        return dir != null ? new File(dir) : files();
+    }
+
     /** The save folder used most recently. */
     private File latestWorld() {
         File[] saves = new File(files(), "UserData/Saves").listFiles();
@@ -140,9 +168,8 @@ public class PregenerateActivity extends Activity {
         return best;
     }
 
-    private void start(int radius) {
+    private void start(int radius, File world) {
         sizes.setVisibility(android.view.View.GONE);
-        File world = latestWorld();
         if (world == null)
             return;
         worldConfig = new File(world, "universe/worlds/default/config.json");
@@ -208,12 +235,13 @@ public class PregenerateActivity extends Activity {
 
     private void launchServer(File world) throws IOException {
         File files = files();
+        File game = game();
         List<String> cmd = new ArrayList<>();
         cmd.add(new File(getFilesDir(), "java").getAbsolutePath());
         cmd.add("-jar");
-        cmd.add(new File(files, "Server/HytaleServer.jar").getAbsolutePath());
+        cmd.add(new File(game, "Server/HytaleServer.jar").getAbsolutePath());
         cmd.add("--assets");
-        cmd.add(new File(files, "Assets.zip").getAbsolutePath());
+        cmd.add(new File(game, "Assets.zip").getAbsolutePath());
         cmd.add("--auth-mode");
         cmd.add("insecure");
         cmd.add("--singleplayer");
@@ -294,7 +322,16 @@ public class PregenerateActivity extends Activity {
 
     private void finished(int exit, String lastLines) {
         server = null;
+        if (auto) {
+            if (stopping || skipped)
+                mark(autoWorld);
+            if (!stopping && !skipped)
+                Log.w(TAG, "pre-generation stopped early (" + exit + "): " + lastLines);
+            startGame();
+            return;
+        }
         if (stopping) {
+            mark(worldConfig.getParentFile().getParentFile().getParentFile().getParentFile());
             bar.setProgress(1000);
             status.setText("Pronto! A área está gerada. Pode abrir o jogo.");
             detail.setText(total + " chunks gerados.");
@@ -302,6 +339,38 @@ public class PregenerateActivity extends Activity {
             status.setText("O servidor parou antes de terminar (código " + exit + ").");
             detail.setText(lastLines);
         }
+    }
+
+    /** Skips the pre-generation of this new world for good and opens the game. */
+    private void skip() {
+        skipped = true;
+        if (server != null && server.isAlive()) {
+            status.setText("Salvando o que já foi gerado…");
+            server.destroy(); // finished() opens the game once it has saved
+        } else {
+            removeRegion();
+            mark(autoWorld);
+            startGame();
+        }
+    }
+
+    static void mark(File world) {
+        try {
+            new File(world, MARKER).createNewFile();
+        } catch (IOException e) {
+            Log.w(TAG, "could not mark " + world + ": " + e);
+        }
+    }
+
+    private void startGame() {
+        Intent game = new Intent(this, HytaleActivity.class);
+        if (getIntent() != null && getIntent().getExtras() != null)
+            game.putExtras(getIntent().getExtras());
+        game.removeExtra(AUTO_EXTRA);
+        game.removeExtra(WORLD_EXTRA);
+        game.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        startActivity(game);
+        finish();
     }
 
     @Override

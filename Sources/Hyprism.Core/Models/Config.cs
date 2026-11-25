@@ -120,6 +120,21 @@ public class Config
     public bool ShowAlphaMods { get; set; } = false;
 
     /// <summary>
+    /// Android: battery mode, a lower frame rate (about 45 FPS, or 30 where the display has no such mode)
+    /// </summary>
+    public bool PhoneBatterySaver { get; set; } = false;
+
+    /// <summary>
+    /// Android: large game textures at half size (less GPU memory and bandwidth)
+    /// </summary>
+    public bool PhoneHalfTextures { get; set; } = false;
+
+    /// <summary>
+    /// Android: pre-generate the land around the player in new worlds before playing
+    /// </summary>
+    public bool PhonePregenerateNewWorlds { get; set; } = true;
+
+    /// <summary>
     /// Whether the user has completed the initial onboarding flow
     /// </summary>
     public bool HasCompletedOnboarding { get; set; } = false;
