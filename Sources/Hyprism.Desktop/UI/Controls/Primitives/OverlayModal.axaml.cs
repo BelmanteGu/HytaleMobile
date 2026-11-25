@@ -60,6 +60,8 @@ public sealed partial class OverlayModal : UserControl
     public OverlayModal()
     {
         InitializeComponent();
+        if (OperatingSystem.IsAndroid())
+            OverlayModalScroller.VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
         _initialized = true;
         ApplyStateImmediately();
         AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);

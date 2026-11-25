@@ -48,9 +48,14 @@ SPDX-License-Identifier: GPL-3.0-only
           </TranslateTransform.Transitions>
         </TranslateTransform>
       </Grid.RenderTransform>
-      <ContentPresenter Content="{Binding ModalContent, ElementName=OverlayRoot}"
-                        HorizontalContentAlignment="Stretch"
-                        VerticalContentAlignment="Stretch" />
+      <!-- Scrolls only on Android (see the code-behind): a landscape phone is shorter than a sheet -->
+      <ScrollViewer x:Name="OverlayModalScroller"
+                    HorizontalScrollBarVisibility="Disabled"
+                    VerticalScrollBarVisibility="Disabled">
+        <ContentPresenter Content="{Binding ModalContent, ElementName=OverlayRoot}"
+                          HorizontalContentAlignment="Stretch"
+                          VerticalContentAlignment="Stretch" />
+      </ScrollViewer>
     </Grid>
 
     <Grid x:Name="OverlayModalShoulders"

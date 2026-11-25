@@ -86,6 +86,17 @@ func main() {
 		usage()
 	}
 	p.patch, p.old = positional[0], positional[1]
+	// The bowls want the real folders: a launcher may hand over a link to the game folder.
+	for _, dir := range []*string{&p.old, &p.dir, &p.staging} {
+		if *dir == "" {
+			continue
+		}
+		if err := os.MkdirAll(*dir, 0o755); err == nil {
+			if real, err := filepath.EvalSymlinks(*dir); err == nil {
+				*dir = real
+			}
+		}
+	}
 	if err := apply(context.Background(), p); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)

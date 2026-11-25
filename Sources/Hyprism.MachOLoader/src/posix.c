@@ -53,6 +53,21 @@ static void note_found(const char *what, const char *path)
         macho_log("fs", "%s found: %s", what, strstr(path, "/Interface/"));
 }
 
+// Newer clients (build 39) look for their data next to the executable, Contents/MacOS/Data, which
+// on macOS resolves through the bundle; the files are in Contents/Resources/Data.
+static const char *bundle_path(const char *path, char *buf, size_t size)
+{
+    static const char macos_data[] = "/Contents/MacOS/Data";
+    const char *at = path ? strstr(path, macos_data) : NULL;
+    if (!at)
+        return path;
+    const char *rest = at + sizeof macos_data - 1;
+    if (*rest && *rest != '/')
+        return path;
+    snprintf(buf, size, "%.*s/Contents/Resources/Data%s", (int)(at - path), path, rest);
+    return buf;
+}
+
 static int fail(int host_errno)
 {
     errno = host_errno;
@@ -159,6 +174,8 @@ static int oflags_to_apple(int f)
 int shim_open_stack(const char *path, int flags, void *slots)
 {
     mode_t mode = (mode_t)*(uint64_t *)slots;
+    char fixed[PATH_MAX];
+    path = bundle_path(path, fixed, sizeof fixed);
     int fd = open(path, oflags_from_apple(flags), mode);
     if (fd < 0)
         note_missing("open", path);
@@ -287,6 +304,8 @@ static void stat_to_apple(const struct stat *h, struct apple_stat *a)
 static int apple_stat(const char *path, struct apple_stat *out)
 {
     struct stat h;
+    char fixed[PATH_MAX];
+    path = bundle_path(path, fixed, sizeof fixed);
     int rc = stat(path, &h);
     if (rc == 0) {
         stat_to_apple(&h, out);
@@ -299,6 +318,8 @@ static int apple_stat(const char *path, struct apple_stat *out)
 static int apple_lstat(const char *path, struct apple_stat *out)
 {
     struct stat h;
+    char fixed[PATH_MAX];
+    path = bundle_path(path, fixed, sizeof fixed);
     int rc = lstat(path, &h);
     if (rc == 0) {
         stat_to_apple(&h, out);
@@ -391,8 +412,22 @@ struct apple_dir {
     struct apple_dirent entry;
 };
 
+static char *apple_realpath(const char *path, char *resolved)
+{
+    char fixed[PATH_MAX];
+    return realpath(bundle_path(path, fixed, sizeof fixed), resolved);
+}
+
+static FILE *apple_fopen(const char *path, const char *mode)
+{
+    char fixed[PATH_MAX];
+    return fopen(bundle_path(path, fixed, sizeof fixed), mode);
+}
+
 static struct apple_dir *apple_opendir(const char *path)
 {
+    char fixed[PATH_MAX];
+    path = bundle_path(path, fixed, sizeof fixed);
     DIR *d = opendir(path);
     if (!d) {
         note_missing("opendir", path);
@@ -1025,7 +1060,7 @@ const struct shim posix_shims[] = {
     { "_sysctlnametomib", (void *)apple_sysctlnametomib },
     { "_getpwuid_r", (void *)apple_getpwuid_r },
     { "_getpwnam_r", (void *)apple_getpwnam_r },
-    { "_fopen", (void *)fopen }, { "_fileno", (void *)fileno },
+    { "_fopen", (void *)apple_fopen }, { "_fileno", (void *)fileno },
     { "_fopen$DARWIN_EXTSN", (void *)fopen },
     { "_fclose", (void *)fclose },
     { "_fread", (void *)fread },
@@ -1042,7 +1077,7 @@ const struct shim posix_shims[] = {
     { "_utimensat", (void *)utimensat },
     { "_flock", (void *)flock },
     { "_mkstemps", (void *)mkstemps },
-    { "_realpath$DARWIN_EXTSN", (void *)realpath },
+    { "_realpath$DARWIN_EXTSN", (void *)apple_realpath },
     { "_gethostname", (void *)gethostname },
     { "_getsid", (void *)getsid },
     { "_setsid", (void *)setsid },

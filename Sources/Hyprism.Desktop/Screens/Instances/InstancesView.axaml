@@ -440,7 +440,11 @@ SPDX-License-Identifier: GPL-3.0-only
             </TranslateTransform.Transitions>
           </TranslateTransform>
         </Border.RenderTransform>
-        <instances:InstanceCreatorView x:Name="InstanceCreatorContentView" />
+        <!-- Scrolls when the wizard is taller than the screen (a phone in landscape) -->
+        <controls:SmoothScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                     VerticalScrollBarVisibility="Auto">
+          <instances:InstanceCreatorView x:Name="InstanceCreatorContentView" />
+        </controls:SmoothScrollViewer>
       </Border>
     </Grid>
 
