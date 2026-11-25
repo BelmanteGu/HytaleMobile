@@ -48,9 +48,9 @@ public class GamepadOverlay extends View {
     static native void nativeAxis(int axis, int value);
     static native void nativeButton(int button, boolean down);
     static native boolean nativeCaptured();
-    static native void nativeKey(int scancode, boolean down);
 
-    private static final int SCANCODE_1 = 30; // SDL_SCANCODE_1; the hotbar slots are the keys 1 to 9
+    // The hotbar slots are the keys 1 to 9. They go through SDL's own Android key path, which updates the
+    // keyboard state as well as queueing the event, so a client that polls the state sees them too.
 
     // Where fx is measured from. Left and right edges, and the centre line, count in screen heights, so
     // the layout keeps its proportions on any aspect ratio; fy and side are fractions of the height.
@@ -189,6 +189,8 @@ public class GamepadOverlay extends View {
                 if (menuVotes >= 2) {
                     inGame = now;
                     menuVotes = 0;
+                    if (debug)
+                        Log.v(TAG, "pointer captured=" + captured + " -> controls " + (inGame ? "on" : "off"));
                     if (!inGame)
                         releaseAll();
                     invalidate();
@@ -357,9 +359,9 @@ public class GamepadOverlay extends View {
                 press(c, true);
             } else if (hotbarSlot(x, y) >= 0) {
                 roles.put(id, ROLE_HOTBAR);
-                int key = SCANCODE_1 + hotbarSlot(x, y);
-                nativeKey(key, true);
-                handler.postDelayed(() -> nativeKey(key, false), 40);
+                int key = android.view.KeyEvent.KEYCODE_1 + hotbarSlot(x, y);
+                org.libsdl.app.SDLActivity.onNativeKeyDown(key);
+                handler.postDelayed(() -> org.libsdl.app.SDLActivity.onNativeKeyUp(key), 40);
             } else if (x < getWidth() * 0.45f && !stickActive) {
                 if (runLocked)
                     unlockRun(); // a thumb back on the stick takes over

@@ -149,12 +149,19 @@ static void scale_event(SDL_Event *e)
 // Fingers only reach SDL in menus: GamepadOverlay consumes the touches during play.
 static SDL_FingerID g_fingers[8];
 static int g_finger_count;
+// The first finger's touch already pressed the left mouse button; when a second finger lands (a scroll
+// begins) that press is released, so the game does not start dragging an item or a slider.
+static bool g_release_press;
 
 static void track_fingers(const SDL_Event *e)
 {
-    if (e->type == SDL_EVENT_FINGER_DOWN) {
+    if (e->type == SDL_EVENT_WINDOW_FOCUS_LOST) {
+        g_finger_count = 0; // the lifts of fingers that were down are not delivered
+    } else if (e->type == SDL_EVENT_FINGER_DOWN) {
         if (g_finger_count < 8)
             g_fingers[g_finger_count++] = e->tfinger.fingerID;
+        if (g_finger_count == 2)
+            g_release_press = true;
     } else if (e->type == SDL_EVENT_FINGER_UP || e->type == SDL_EVENT_FINGER_CANCELED) {
         for (int i = 0; i < g_finger_count; i++) {
             if (g_fingers[i] == e->tfinger.fingerID) {
@@ -170,6 +177,26 @@ static bool w_PollEvent(SDL_Event *event)
     REAL(SDL_PollEvent);
     REAL(SDL_GetMouseState);
     REAL(SDL_GetTicksNS);
+    if (g_release_press && event) {
+        REAL(SDL_GetKeyboardFocus);
+        REAL(SDL_GetWindowID);
+        g_release_press = false;
+        SDL_Window *focus = real_SDL_GetKeyboardFocus();
+        float mx = 0, my = 0;
+        real_SDL_GetMouseState(&mx, &my);
+        memset(event, 0, sizeof(*event));
+        event->type = SDL_EVENT_MOUSE_BUTTON_UP;
+        event->button.timestamp = real_SDL_GetTicksNS();
+        event->button.windowID = focus ? real_SDL_GetWindowID(focus) : 0;
+        event->button.which = SDL_TOUCH_MOUSEID;
+        event->button.button = SDL_BUTTON_LEFT;
+        event->button.down = false;
+        event->button.clicks = 1;
+        event->button.x = mx;
+        event->button.y = my;
+        scale_event(event);
+        return true;
+    }
     while (real_SDL_PollEvent(event)) {
         if (!event)
             return true;
