@@ -48,6 +48,7 @@ public class GamepadOverlay extends View {
     static native void nativeAxis(int axis, int value);
     static native void nativeButton(int button, boolean down);
     static native boolean nativeCaptured();
+    static native void nativeMouseMove(int dx, int dy);
 
     // The hotbar slots are the keys 1 to 9. They go through SDL's own Android key path, which updates the
     // keyboard state as well as queueing the event, so a client that polls the state sees them too.
@@ -146,6 +147,21 @@ public class GamepadOverlay extends View {
     // character keeps sprinting forward on its own, so the thumb is free for the camera. A new touch on
     // the stick side, the padlock or the sprint button gives control back.
     private static final float LOCK_AT = 1.9f, LOCK_CONE = 0.5f;
+    // Bedrock-style touch (GameSettings.touchAim). A finger that rests on the view (not on a control and
+    // outside the stick's corner) aims there: the camera turns until the touched point is under the
+    // crosshair, then a quick tap uses or places (left trigger) and holding for AIM_HOLD_MS breaks or
+    // attacks (right trigger) for as long as the finger stays. A finger that moves is just the camera.
+    private static final int AIM_NONE = 0, AIM_PENDING = 1, AIM_HOLDING = 2;
+    private static final long AIM_HOLD_MS = 220;
+    // Degrees the game turns per unit of relative mouse movement at its default mouse speed, measured on
+    // the phone (see PROGRESS.md); GameSettings.aimScale corrects it.
+    private static final float DEG_PER_COUNT = 0.07f;
+    private boolean touchAim;
+    private float aimScale = 1f, fovDegrees = 75f;
+    private int aimState, glideToken;
+    private float aimX, aimY;
+    private boolean aimTriggerDown;
+    private final Runnable aimHold = this::aimHoldStart;
     private Runnable onOpenSettings;
     private float controlScale = 1f;
     private boolean sprinting, runLocked, inLockZone;
@@ -199,6 +215,8 @@ public class GamepadOverlay extends View {
                         Log.v(TAG, "pointer captured=" + captured + " -> controls " + (inGame ? "on" : "off"));
                     if (!inGame)
                         releaseAll();
+                    else
+                        loadFov(); // the player may have changed it in the settings
                     invalidate();
                 }
             }
@@ -214,6 +232,9 @@ public class GamepadOverlay extends View {
         super(context);
         prefs = context.getSharedPreferences("gamepad", Context.MODE_PRIVATE);
         controlScale = GameSettings.controlSize(context);
+        touchAim = GameSettings.touchAim(context);
+        aimScale = GameSettings.aimScale(context);
+        loadFov();
         loadLayout();
         stroke.setStyle(Paint.Style.STROKE);
         stroke.setStrokeWidth(2 * getResources().getDisplayMetrics().density);
@@ -286,6 +307,8 @@ public class GamepadOverlay extends View {
     /** Picks up the control size set in the panel. */
     void reloadSettings() {
         controlScale = GameSettings.controlSize(getContext());
+        touchAim = GameSettings.touchAim(getContext());
+        aimScale = GameSettings.aimScale(getContext());
         invalidate();
     }
 
@@ -414,7 +437,7 @@ public class GamepadOverlay extends View {
             } else if (hotbarSlot(x, y) >= 0) {
                 roles.put(id, ROLE_HOTBAR);
                 tapHotbar(hotbarSlot(x, y));
-            } else if (x < getWidth() * 0.45f && !stickActive) {
+            } else if (inStickZone(x, y) && !stickActive) {
                 if (runLocked)
                     unlockRun(); // a thumb back on the stick takes over
                 roles.put(id, ROLE_STICK);
@@ -427,6 +450,8 @@ public class GamepadOverlay extends View {
                 // The first finger on the camera keeps it; another one landing there does not take it over.
                 if (lookPointer == -1 || roles.get(lookPointer) == null)
                     lookPointer = id;
+                if (touchAim && lookPointer == id)
+                    aimBegin(x, y);
             }
             if (debug)
                 Log.v(TAG, "down id=" + id + " role=" + roles.get(id) + " x=" + (int) x + " y=" + (int) y
@@ -459,6 +484,14 @@ public class GamepadOverlay extends View {
                     }
                     if (lookPointer == -1 || lookPointer == pid || roles.get(lookPointer) == null) {
                         lookPointer = pid;
+                        if (touchAim && pid == lookPointer && aimState == AIM_PENDING) {
+                            // Still a tap or a hold until the finger really moves; then it is the camera.
+                            if (Math.hypot(px - aimX, py - aimY) <= slop)
+                                continue;
+                            aimCancelPending();
+                            prev[0] = px; // the camera starts from here, with no jump
+                            prev[1] = py;
+                        }
                         look(prev, px, py);
                     }
                 }
@@ -482,6 +515,8 @@ public class GamepadOverlay extends View {
                     action != MotionEvent.ACTION_CANCEL && overGear(x, y));
             if (lookPointer == id) {
                 lookPointer = -1;
+                if (touchAim)
+                    aimEnd(action != MotionEvent.ACTION_CANCEL);
                 handler.removeCallbacks(lookStop);
                 lookStop.run();
             }
@@ -597,10 +632,129 @@ public class GamepadOverlay extends View {
         nativeAxis(LEFT_X, 0);
         nativeAxis(LEFT_Y, 0);
         lookStop.run();
+        aimReset();
         roles.clear();
         last.clear();
         dragging.clear();
         lookPointer = -1;
+    }
+
+    // The movement stick starts in the lower-left corner when touch aiming is on (the rest of the screen
+    // is for aiming); otherwise anywhere in the left 45%.
+    private boolean inStickZone(float x, float y) {
+        float h = getHeight();
+        if (!touchAim)
+            return x < getWidth() * 0.45f;
+        return x < padX() + 0.36f * h && y > h * 0.36f;
+    }
+
+    private void loadFov() {
+        try {
+            java.io.File f = new java.io.File(getContext().getExternalFilesDir(null), "UserData/Settings.json");
+            if (!f.isFile())
+                return;
+            String json = new String(java.nio.file.Files.readAllBytes(f.toPath()), java.nio.charset.StandardCharsets.UTF_8);
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"FieldOfView\"\\s*:\\s*([0-9.]+)").matcher(json);
+            if (m.find())
+                fovDegrees = Math.max(30f, Math.min(130f, Float.parseFloat(m.group(1))));
+        } catch (Exception e) {
+            Log.w(TAG, "could not read the field of view: " + e);
+        }
+    }
+
+    private void aimBegin(float x, float y) {
+        aimState = AIM_PENDING;
+        aimX = x;
+        aimY = y;
+        handler.postDelayed(aimHold, AIM_HOLD_MS);
+        invalidate();
+    }
+
+    // The finger rested for AIM_HOLD_MS: aim at it, then hold the attack/mine trigger.
+    private void aimHoldStart() {
+        if (aimState != AIM_PENDING)
+            return;
+        aimState = AIM_HOLDING;
+        performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+        glideTo(aimX, aimY, () -> {
+            if (aimState == AIM_HOLDING) {
+                aimTriggerDown = true;
+                nativeAxis(RIGHT_TRIGGER, AXIS_MAX);
+            }
+        });
+        invalidate();
+    }
+
+    private void aimCancelPending() {
+        if (aimState == AIM_PENDING) {
+            handler.removeCallbacks(aimHold);
+            aimState = AIM_NONE;
+            invalidate();
+        }
+    }
+
+    // The finger left: a tap (it never held or moved) aims and uses or places; a hold ends.
+    private void aimEnd(boolean released) {
+        if (aimState == AIM_PENDING) {
+            handler.removeCallbacks(aimHold);
+            aimState = AIM_NONE;
+            if (released) {
+                glideTo(aimX, aimY, () -> {
+                    nativeAxis(LEFT_TRIGGER, AXIS_MAX);
+                    handler.postDelayed(() -> nativeAxis(LEFT_TRIGGER, AXIS_MIN), 90);
+                });
+            }
+        } else if (aimState == AIM_HOLDING) {
+            aimState = AIM_NONE;
+            if (aimTriggerDown) {
+                aimTriggerDown = false;
+                nativeAxis(RIGHT_TRIGGER, AXIS_MIN);
+            }
+        }
+        invalidate();
+    }
+
+    private void aimReset() {
+        handler.removeCallbacks(aimHold);
+        glideToken++;
+        aimState = AIM_NONE;
+        if (aimTriggerDown) {
+            aimTriggerDown = false;
+            nativeAxis(RIGHT_TRIGGER, AXIS_MIN);
+        }
+    }
+
+    /**
+     * Turns the camera so that the point (x, y) of the screen ends up under the crosshair (the screen's
+     * centre), as relative mouse movement in small steps so the turn looks smooth, then runs done. The
+     * angles come from the field of view: a point dx right and dy below the centre, with the focal length
+     * f = (height / 2) / tan(fov / 2), is yaw = atan(dx / f) away and pitch = atan(dy / hypot(dx, f)).
+     */
+    private void glideTo(float x, float y, Runnable done) {
+        float w = getWidth(), h = getHeight();
+        double dx = x - w / 2f, dy = y - h / 2f;
+        double f = (h / 2.0) / Math.tan(Math.toRadians(fovDegrees) / 2);
+        double yaw = Math.toDegrees(Math.atan2(dx, f));
+        double pitch = Math.toDegrees(Math.atan(dy / Math.hypot(dx, f)));
+        int cx = (int) Math.round(yaw / DEG_PER_COUNT * aimScale);
+        int cy = (int) Math.round(pitch / DEG_PER_COUNT * aimScale);
+        int steps = Math.max(1, (int) Math.ceil(Math.max(Math.abs(cx), Math.abs(cy)) / 40.0));
+        int token = ++glideToken;
+        if (debug)
+            Log.v(TAG, "aim at " + (int) x + "," + (int) y + " yaw=" + (int) yaw + " pitch=" + (int) pitch
+                + " counts=" + cx + "," + cy + " steps=" + steps + " fov=" + fovDegrees);
+        for (int i = 0; i < steps; i++) {
+            final int sx = Math.round((float) cx * (i + 1) / steps) - Math.round((float) cx * i / steps);
+            final int sy = Math.round((float) cy * (i + 1) / steps) - Math.round((float) cy * i / steps);
+            handler.postDelayed(() -> {
+                if (token == glideToken)
+                    nativeMouseMove(sx, sy);
+            }, i * 8L);
+        }
+        handler.postDelayed(() -> {
+            if (token == glideToken)
+                done.run();
+        }, steps * 8L + 40);
     }
 
     private void moveStick(float x, float y) {
@@ -853,6 +1007,25 @@ public class GamepadOverlay extends View {
             return;
         }
         drawStick(canvas);
+        if (aimState != AIM_NONE)
+            drawAimRing(canvas);
+    }
+
+    // A ring on the touched point: thin while the finger decides between tap and hold, filled while it holds.
+    private void drawAimRing(Canvas canvas) {
+        float h = getHeight(), r = h * 0.05f;
+        boolean holding = aimState == AIM_HOLDING;
+        stroke.setColor(holding ? ACCENT : GLYPH);
+        stroke.setStrokeWidth(Math.max(2f, h * 0.004f));
+        stroke.setAlpha(holding ? 255 : 170);
+        canvas.drawCircle(aimX, aimY, r, stroke);
+        if (holding) {
+            fill.setColor(ACCENT);
+            fill.setAlpha(70);
+            canvas.drawCircle(aimX, aimY, r, fill);
+            fill.setAlpha(255);
+        }
+        stroke.setAlpha(255);
     }
 
     private void drawControl(Canvas canvas, Control c) {

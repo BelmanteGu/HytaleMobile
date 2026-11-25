@@ -89,3 +89,24 @@ JNIEXPORT jboolean JNICALL Java_org_hyprism_game_GamepadOverlay_nativeCaptured(J
         return JNI_TRUE;
     return SDL_CursorVisible() ? JNI_FALSE : JNI_TRUE;
 }
+
+// A relative mouse movement, which turns the camera by a known amount (the client reads the motion
+// events' xrel/yrel in relative mouse mode). GamepadOverlay uses it to aim at the point that was touched.
+JNIEXPORT void JNICALL Java_org_hyprism_game_GamepadOverlay_nativeMouseMove(JNIEnv *env, jclass cls, jint dx, jint dy)
+{
+    (void)env; (void)cls;
+    SDL_Event e;
+    SDL_zero(e);
+    SDL_Window *window = SDL_GetKeyboardFocus();
+    float x = 0, y = 0;
+    SDL_GetMouseState(&x, &y);
+    e.type = SDL_EVENT_MOUSE_MOTION;
+    e.motion.timestamp = SDL_GetTicksNS();
+    e.motion.windowID = window ? SDL_GetWindowID(window) : 0;
+    e.motion.which = 0;
+    e.motion.x = x;
+    e.motion.y = y;
+    e.motion.xrel = (float)dx;
+    e.motion.yrel = (float)dy;
+    SDL_PushEvent(&e);
+}
