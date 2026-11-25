@@ -288,6 +288,7 @@ public class GamepadOverlay extends View {
         InputManager im = (InputManager) getContext().getSystemService(Context.INPUT_SERVICE);
         im.unregisterInputDeviceListener(devices);
         handler.removeCallbacks(poll);
+        releaseHotbarKey();
         super.onDetachedFromWindow();
     }
 
@@ -359,9 +360,7 @@ public class GamepadOverlay extends View {
                 press(c, true);
             } else if (hotbarSlot(x, y) >= 0) {
                 roles.put(id, ROLE_HOTBAR);
-                int key = android.view.KeyEvent.KEYCODE_1 + hotbarSlot(x, y);
-                org.libsdl.app.SDLActivity.onNativeKeyDown(key);
-                handler.postDelayed(() -> org.libsdl.app.SDLActivity.onNativeKeyUp(key), 40);
+                tapHotbar(hotbarSlot(x, y));
             } else if (x < getWidth() * 0.45f && !stickActive) {
                 if (runLocked)
                     unlockRun(); // a thumb back on the stick takes over
@@ -440,6 +439,29 @@ public class GamepadOverlay extends View {
         return live();
     }
 
+    // One hotbar key at a time. It is let go by a timer, and also whenever the controls are released
+    // (a menu opens, the pad is turned off, the window goes away), so a key never stays pressed and
+    // never leaves the stick, the camera or the buttons in a state of their own.
+    private int hotbarKey = -1;
+    private final Runnable hotbarUp = this::releaseHotbarKey;
+
+    private void tapHotbar(int slot) {
+        releaseHotbarKey();
+        hotbarKey = android.view.KeyEvent.KEYCODE_1 + slot;
+        org.libsdl.app.SDLActivity.onNativeKeyDown(hotbarKey);
+        handler.postDelayed(hotbarUp, 60);
+        if (debug)
+            Log.v(TAG, "hotbar slot " + (slot + 1));
+    }
+
+    private void releaseHotbarKey() {
+        handler.removeCallbacks(hotbarUp);
+        if (hotbarKey >= 0) {
+            org.libsdl.app.SDLActivity.onNativeKeyUp(hotbarKey);
+            hotbarKey = -1;
+        }
+    }
+
     private int indexOf(Control c) {
         for (int i = 0; i < controls.length; i++)
             if (controls[i] == c)
@@ -496,6 +518,7 @@ public class GamepadOverlay extends View {
     }
 
     private void releaseAll() {
+        releaseHotbarKey();
         for (Control c : controls)
             if (c.down)
                 press(c, false);
