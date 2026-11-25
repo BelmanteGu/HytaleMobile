@@ -15,7 +15,6 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
-import android.widget.Switch;
 import android.widget.TextView;
 
 /**
@@ -206,11 +205,25 @@ final class GameSettingsPanel extends FrameLayout {
         void changed(boolean on);
     }
 
-    private Switch toggle(boolean on, OnChange change) {
-        Switch s = new Switch(activity);
-        s.setChecked(on);
-        s.setOnCheckedChangeListener((b, checked) -> change.changed(checked));
-        return s;
+    // A button that reads "Ligado" or "Desligado": the framework Switch is nearly invisible on the dark card.
+    private TextView toggle(boolean on, OnChange change) {
+        TextView t = text("", 15, TEXT, true);
+        t.setGravity(Gravity.CENTER);
+        t.setMinWidth(dp(120));
+        t.setPadding(dp(18), dp(10), dp(18), dp(10));
+        boolean[] state = { on };
+        Runnable paint = () -> {
+            t.setText(state[0] ? "Ligado" : "Desligado");
+            t.setTextColor(state[0] ? 0xFF141409 : TEXT);
+            t.setBackground(round(state[0] ? ACCENT : CHIP, dp(10)));
+        };
+        paint.run();
+        t.setOnClickListener(v -> {
+            state[0] = !state[0];
+            paint.run();
+            change.changed(state[0]);
+        });
+        return t;
     }
 
     /** A label and hint with the control below (wide controls) or beside (switches). */
