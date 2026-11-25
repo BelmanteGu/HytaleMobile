@@ -38,6 +38,7 @@ internal sealed class AndroidGameHost(Hyprism.Core.Infrastructure.IConfigStore c
         intent.PutExtra("org.hyprism.game.BATTERY_SAVER", config.PhoneBatterySaver);
         intent.PutExtra("org.hyprism.game.HALF_TEXTURES", config.PhoneHalfTextures);
         intent.PutExtra("org.hyprism.game.PREGENERATE_NEW_WORLDS", config.PhonePregenerateNewWorlds);
+        intent.PutExtra("org.hyprism.game.RENDER_HEIGHT", config.PhoneRenderHeight);
         intent.AddFlags(ActivityFlags.NewTask | ActivityFlags.ClearTop);
         context.StartActivity(intent);
         return Task.CompletedTask;

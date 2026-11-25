@@ -84,6 +84,9 @@ public interface IDesktopSettingsStore
 
     /// <summary>Gets or sets whether Android pre-generates new worlds before playing</summary>
     bool PhonePregenerateNewWorlds { get; set; }
+
+    /// <summary>Gets or sets the Android 3D view height in pixels (0: the game's own setting)</summary>
+    int PhoneRenderHeight { get; set; }
 }
 
 /// <summary>

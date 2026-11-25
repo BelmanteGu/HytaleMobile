@@ -135,6 +135,11 @@ public class Config
     public bool PhonePregenerateNewWorlds { get; set; } = true;
 
     /// <summary>
+    /// Android: the height in pixels the game draws its 3D view at (0 keeps the game's own render scale)
+    /// </summary>
+    public int PhoneRenderHeight { get; set; } = 0;
+
+    /// <summary>
     /// Whether the user has completed the initial onboarding flow
     /// </summary>
     public bool HasCompletedOnboarding { get; set; } = false;

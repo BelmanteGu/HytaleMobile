@@ -106,6 +106,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _phoneBatterySaver;
     [ObservableProperty] private bool _phoneHalfTextures;
     [ObservableProperty] private bool _phonePregenerateNewWorlds;
+    [ObservableProperty] private SettingChoiceViewModel? _selectedPhoneResolution;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsAuthServerVisible))]
     private bool _onlineMode;
@@ -291,6 +292,11 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         _phoneBatterySaver = settings.PhoneBatterySaver;
         _phoneHalfTextures = settings.PhoneHalfTextures;
         _phonePregenerateNewWorlds = settings.PhonePregenerateNewWorlds;
+        PhoneResolutions = new ObservableCollection<SettingChoiceViewModel>(
+            new[] { "0", "540", "480", "360", "240" }.Select(h =>
+                new SettingChoiceViewModel(h, h == "0" ? localizer["settings.phone.resolutionDefault"] : h + "p")));
+        _selectedPhoneResolution = PhoneResolutions.FirstOrDefault(c => c.Value == settings.PhoneRenderHeight.ToString())
+            ?? PhoneResolutions[0];
         _onlineMode = settings.OnlineMode;
         _useCustomJava = settings.UseCustomJava;
         _authDomain = ResolveAuthServer(settings.AuthDomain);
@@ -427,6 +433,10 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     public string PhoneHalfTexturesHint { get; private set; } = string.Empty;
     public string PhonePregenerateLabel { get; private set; } = string.Empty;
     public string PhonePregenerateHint { get; private set; } = string.Empty;
+    public string PhoneResolutionLabel { get; private set; } = string.Empty;
+    public string PhoneResolutionHint { get; private set; } = string.Empty;
+    /// <summary>The 3D view heights offered on Android</summary>
+    public ObservableCollection<SettingChoiceViewModel> PhoneResolutions { get; }
     public string DownloadsInfo { get; private set; } = string.Empty;
     public string DownloadsNoteTitle { get; private set; } = string.Empty;
     public string DownloadSourcesTitle { get; private set; } = string.Empty;
@@ -582,6 +592,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         PhoneHalfTexturesHint = _localizer["settings.phone.halfTexturesHint"];
         PhonePregenerateLabel = _localizer["settings.phone.pregenerate"];
         PhonePregenerateHint = _localizer["settings.phone.pregenerateHint"];
+        PhoneResolutionLabel = _localizer["settings.phone.resolution"];
+        PhoneResolutionHint = _localizer["settings.phone.resolutionHint"];
         DownloadsInfo = _localizer["settings.downloads.howDownloadsWorkDescription"];
         DownloadsNoteTitle = _localizer["common.note"];
         DownloadSourcesTitle = _localizer["settings.downloads.sources"];
@@ -786,6 +798,11 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     partial void OnPhoneBatterySaverChanged(bool value) => _settings.PhoneBatterySaver = value;
     partial void OnPhoneHalfTexturesChanged(bool value) => _settings.PhoneHalfTextures = value;
     partial void OnPhonePregenerateNewWorldsChanged(bool value) => _settings.PhonePregenerateNewWorlds = value;
+    partial void OnSelectedPhoneResolutionChanged(SettingChoiceViewModel? value)
+    {
+        if (value is not null && int.TryParse(value.Value, out var height))
+            _settings.PhoneRenderHeight = height;
+    }
     partial void OnOnlineModeChanged(bool value)
     {
         _settings.OnlineMode = value;

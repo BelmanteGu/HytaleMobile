@@ -3168,4 +3168,13 @@ You may need to reinstall the game if switching drives</value>
   <data name="settings.phone.pregenerateHint" xml:space="preserve">
     <value>Before playing a new world, generates 1 km around you so exploring it later is lighter. Takes a few minutes; it can be skipped</value>
   </data>
+  <data name="settings.phone.resolution" xml:space="preserve">
+    <value>3D resolution</value>
+  </data>
+  <data name="settings.phone.resolutionHint" xml:space="preserve">
+    <value>Draws the game world at this height and scales it to the screen; menus stay sharp. Lower is lighter, for weaker phones</value>
+  </data>
+  <data name="settings.phone.resolutionDefault" xml:space="preserve">
+    <value>Game setting</value>
+  </data>
 </root>

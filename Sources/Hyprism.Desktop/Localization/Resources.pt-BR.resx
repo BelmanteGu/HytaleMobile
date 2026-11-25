@@ -3159,4 +3159,13 @@ Você pode precisar reinstalar o jogo se trocar de unidade</value>
   <data name="settings.phone.pregenerateHint" xml:space="preserve">
     <value>Antes de jogar um mundo novo, gera 1 km em volta de você para explorar depois ficar mais leve. Leva alguns minutos e dá para pular</value>
   </data>
+  <data name="settings.phone.resolution" xml:space="preserve">
+    <value>Resolução do 3D</value>
+  </data>
+  <data name="settings.phone.resolutionHint" xml:space="preserve">
+    <value>Desenha o mundo do jogo nessa altura e estica para a tela; menus continuam nítidos. Menor é mais leve, bom para celulares fracos</value>
+  </data>
+  <data name="settings.phone.resolutionDefault" xml:space="preserve">
+    <value>Do jogo</value>
+  </data>
 </root>

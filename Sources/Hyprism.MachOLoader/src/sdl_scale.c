@@ -144,13 +144,60 @@ static void scale_event(SDL_Event *e)
     }
 }
 
+// SDL turns every touch into mouse input, and a list cannot be scrolled with that. While two fingers
+// are down, their motion becomes mouse wheel events and the synthetic mouse events are dropped.
+// Fingers only reach SDL in menus: GamepadOverlay consumes the touches during play.
+static SDL_FingerID g_fingers[8];
+static int g_finger_count;
+
+static void track_fingers(const SDL_Event *e)
+{
+    if (e->type == SDL_EVENT_FINGER_DOWN) {
+        if (g_finger_count < 8)
+            g_fingers[g_finger_count++] = e->tfinger.fingerID;
+    } else if (e->type == SDL_EVENT_FINGER_UP || e->type == SDL_EVENT_FINGER_CANCELED) {
+        for (int i = 0; i < g_finger_count; i++) {
+            if (g_fingers[i] == e->tfinger.fingerID) {
+                g_fingers[i] = g_fingers[--g_finger_count];
+                break;
+            }
+        }
+    }
+}
+
 static bool w_PollEvent(SDL_Event *event)
 {
     REAL(SDL_PollEvent);
-    bool got = real_SDL_PollEvent(event);
-    if (got && event)
+    REAL(SDL_GetMouseState);
+    REAL(SDL_GetTicksNS);
+    while (real_SDL_PollEvent(event)) {
+        if (!event)
+            return true;
+        track_fingers(event);
+        if (g_finger_count >= 2) {
+            bool mouse = event->type == SDL_EVENT_MOUSE_MOTION || event->type == SDL_EVENT_MOUSE_BUTTON_DOWN
+                || event->type == SDL_EVENT_MOUSE_BUTTON_UP;
+            if (mouse && event->motion.which == SDL_TOUCH_MOUSEID)
+                continue;
+            if (event->type == SDL_EVENT_FINGER_MOTION) {
+                float mx = 0, my = 0, dy = event->tfinger.dy;
+                SDL_WindowID window = event->tfinger.windowID;
+                real_SDL_GetMouseState(&mx, &my);
+                memset(event, 0, sizeof(*event));
+                event->type = SDL_EVENT_MOUSE_WHEEL;
+                event->wheel.timestamp = real_SDL_GetTicksNS();
+                event->wheel.windowID = window;
+                event->wheel.which = SDL_TOUCH_MOUSEID;
+                event->wheel.y = dy * 6.0f; // two fingers move, so a swipe over half the screen is 6 notches
+                event->wheel.direction = SDL_MOUSEWHEEL_NORMAL;
+                event->wheel.mouse_x = mx;
+                event->wheel.mouse_y = my;
+            }
+        }
         scale_event(event);
-    return got;
+        return true;
+    }
+    return false;
 }
 
 static const struct { const char *name; void *fn; } k_wrappers[] = {

@@ -52,6 +52,7 @@ public class SetupActivity extends Activity {
         Thread worker = new Thread(() -> {
             try {
                 setup.run();
+                applyRenderHeight();
                 java.io.File world = worldToPregenerate();
                 runOnUiThread(() -> {
                     if (world != null)
@@ -68,6 +69,52 @@ public class SetupActivity extends Activity {
             }
         }, "HytaleSetup");
         worker.start();
+    }
+
+    /** Launcher setting: the height the 3D view is drawn at (0: the game's own render scale). */
+    static final String RENDER_HEIGHT_EXTRA = "org.hyprism.game.RENDER_HEIGHT";
+    private static final java.util.regex.Pattern RENDER_SCALE =
+        java.util.regex.Pattern.compile("(\"RenderScale\"\\s*:\\s*)(\\d+)");
+
+    /**
+     * Sets the game's RenderScale so its 3D view is drawn at the chosen height (the game takes values
+     * below the 50% its menu offers), keeping the player's own value to put back when the launcher
+     * setting returns to the game's.
+     */
+    private void applyRenderHeight() {
+        int height = getIntent() != null ? getIntent().getIntExtra(RENDER_HEIGHT_EXTRA, 0) : 0;
+        java.io.File settings = new java.io.File(getExternalFilesDir(null), "UserData/Settings.json");
+        java.io.File saved = new java.io.File(getFilesDir(), "renderscale.player");
+        try {
+            if (!settings.isFile())
+                return;
+            String json = new String(java.nio.file.Files.readAllBytes(settings.toPath()), java.nio.charset.StandardCharsets.UTF_8);
+            java.util.regex.Matcher m = RENDER_SCALE.matcher(json);
+            if (!m.find())
+                return;
+            int current = Integer.parseInt(m.group(2));
+            int wanted;
+            if (height > 0) {
+                android.graphics.Point size = new android.graphics.Point();
+                getWindowManager().getDefaultDisplay().getRealSize(size);
+                int screen = Math.min(size.x, size.y);
+                wanted = Math.max(10, Math.min(100, Math.round(100f * height / screen)));
+                if (!saved.exists())
+                    java.nio.file.Files.write(saved.toPath(), String.valueOf(current).getBytes());
+            } else if (saved.exists()) {
+                wanted = Integer.parseInt(new String(java.nio.file.Files.readAllBytes(saved.toPath())).trim());
+                saved.delete();
+            } else {
+                return;
+            }
+            if (wanted == current)
+                return;
+            json = m.replaceFirst("$1" + wanted);
+            java.nio.file.Files.write(settings.toPath(), json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            Log.i("HytaleSetup", "render scale " + current + "% -> " + wanted + "%");
+        } catch (Exception e) {
+            Log.w("HytaleSetup", "could not set the render scale: " + e);
+        }
     }
 
     /** Launcher setting: pre-generate the land around the player in worlds made after it was turned on. */

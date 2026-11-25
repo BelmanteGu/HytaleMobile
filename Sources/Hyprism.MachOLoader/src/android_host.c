@@ -145,6 +145,12 @@ int SDL_main(int argc, char *argv[])
             fclose(config);
         }
     }
+    // The client's .NET GC: compact harder before growing the heap (ConserveMemory) and a 16 MB
+    // allocation budget between young collections instead of one sized for a desktop CPU cache.
+    // Measured on the S23 walking in a world: ~130 MB less (RAM + swap), no added jank. env.txt
+    // entries win over these.
+    setenv("DOTNET_GCConserveMemory", "7", 0);
+    setenv("DOTNET_GCgen0size", "0x1000000", 0);
     setenv("SDL_OPENGL_LIBRARY", "libmobileglues.so", 0);
     setenv("SDL_EGL_LIBRARY", "libmobileglues.so", 0);
     setenv("HOME", files, 1);

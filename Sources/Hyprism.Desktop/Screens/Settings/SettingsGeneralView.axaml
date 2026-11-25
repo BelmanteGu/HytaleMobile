@@ -40,6 +40,14 @@ SPDX-License-Identifier: GPL-3.0-only
                     <controls:FormRow Label="{Binding PhoneBatterySaverLabel}" Hint="{Binding PhoneBatterySaverHint}">
                       <ToggleSwitch Classes="uiToggle" IsChecked="{Binding PhoneBatterySaver}" />
                     </controls:FormRow>
+                    <controls:FormRow Label="{Binding PhoneResolutionLabel}" Hint="{Binding PhoneResolutionHint}">
+                      <controls:FadingComboBox Width="200"
+                                               Classes="uiComboBox"
+                                               ItemsSource="{Binding PhoneResolutions}"
+                                               ItemTemplate="{StaticResource SettingChoiceTemplate}"
+                                               ItemContainerTheme="{StaticResource UiComboBoxItemTheme}"
+                                               SelectedItem="{Binding SelectedPhoneResolution}" />
+                    </controls:FormRow>
                     <controls:FormRow Label="{Binding PhoneHalfTexturesLabel}" Hint="{Binding PhoneHalfTexturesHint}">
                       <ToggleSwitch Classes="uiToggle" IsChecked="{Binding PhoneHalfTextures}" />
                     </controls:FormRow>

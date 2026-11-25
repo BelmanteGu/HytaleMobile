@@ -91,7 +91,7 @@ The detailed log, in Portuguese, is in [progress/PROGRESS.md](progress/PROGRESS.
 | 🚀 **Native** | The macOS arm64 client (NativeAOT .NET) is mapped by a Mach-O loader and runs directly on the CPU. Only the operating system's interfaces are translated, onto Bionic, SDL3, MobileGlues and OpenAL Soft. |
 | 🌍 **Local worlds** | A bundled OpenJDK 25 runs `HytaleServer.jar` on the phone, started by the client as on desktop. The server's native libraries (QUIC, RocksDB, zstd) are built for Android. |
 | 🌐 **Online servers** | Session certificate, QUIC with mTLS and HTTPS work over Android's own TLS. |
-| 🎮 **Touch controls** | An on-screen gamepad feeds an SDL virtual controller. Every button shows its action (jump, crouch, attack, interact, abilities…) with the controller label in the corner, following Hytale's own bindings; the ability buttons press RB + Y/X for you. Stick to move, swipe to look. The **PAD** button turns it off so touches act as a mouse in menus. |
+| 🎮 **Touch controls** | Touch controls drawn like a mobile game: a top bar (exit, emotes, menu, player list, map, show/hide, utility item), sprint and block on the left, jump, crouch, attack and inventory on the right, a stick pad and the hotbar slots as touch targets. They exist only during play: in menus, modals and settings touches are plain input, and two fingers scroll lists. Plugging in a USB or Bluetooth gamepad turns the on-screen one off. The eye button turns the pad on and off; hold it to move and resize buttons. |
 | 🧊 **Runs cooler** | VSync at the 60 Hz panel instead of an uncapped frame rate, sustained-performance mode, a lighter OpenAL mix, and a world server tuned for a phone: bounded heap, fewer GC and JIT threads, no busy-waiting tick, 20 ticks per second, kept off the fastest core. |
 | 🔊 **Audio** | OpenAL Soft on OpenSL ES. |
 | 📲 **One APK, no computer** | One app holds the launcher and the game. It downloads the official build from Hytale's servers, installs it with a built-in patcher, and sets up the world server's Java and native libraries itself the first time you play. |
@@ -199,6 +199,7 @@ The app keeps the game files in `/sdcard/Android/data/org.hyprism.game/files`.
 - [.NET](https://dotnet.microsoft.com/) and [Avalonia](https://avaloniaui.net/) for the launcher
 - [OpenJDK](https://openjdk.org/) as packaged by [Termux](https://termux.dev/), and the CA trust store from [Eclipse Temurin](https://adoptium.net/)
 - [quiche](https://github.com/cloudflare/quiche) and BoringSSL, [RocksDB](https://rocksdb.org/), [zstd](https://github.com/facebook/zstd) and [zstd-jni](https://github.com/luben/zstd-jni) for the server
+- **Touch controls:** the layout, proportions and look of the on-screen controls (top bar, octagon buttons, stick pad, diamond knob) follow the mobile-game controls shown by the YouTube channel **[Zhondre](https://www.youtube.com/@Zhondre)**; the glyphs were cut from the reference images they came from. Thanks to Zhondre for the design.
 - And Hytale by Hypixel Studios. Get it if you haven't.
 
 <div align="center">
