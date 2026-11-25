@@ -50,6 +50,32 @@ def rewrite_utf8(data: bytes, old: str, new: str) -> bytes:
     return bytes(out + data[pos:])
 
 
+def rewrite_long(data: bytes, old: int, new: int) -> bytes:
+    """Rewrites the one CONSTANT_Long equal to `old` in a class file."""
+    count = struct.unpack(">H", data[8:10])[0]
+    pos, index, hits, out = 10, 1, 0, bytearray(data)
+    sizes = {3: 4, 4: 4, 5: 8, 6: 8, 7: 2, 8: 2, 9: 4, 10: 4, 11: 4, 12: 4,
+             15: 3, 16: 2, 17: 4, 18: 4, 19: 2, 20: 2}
+    while index < count:
+        tag = data[pos]
+        if tag == 1:
+            pos += 3 + struct.unpack(">H", data[pos + 1:pos + 3])[0]
+        else:
+            if tag == 5 and struct.unpack(">q", data[pos + 1:pos + 9])[0] == old:
+                out[pos + 1:pos + 9] = struct.pack(">q", new)
+                hits += 1
+            pos += 1 + sizes[tag]
+        index += 2 if tag in (5, 6) else 1
+    if hits != 1:
+        raise SystemExit(f"long constant {old} found {hits} times")
+    return bytes(out)
+
+
+# Every ECS system keeps a HistoricMetric sampled every 33 333 333 ns (30 a second) over windows of
+# 1 s, 1 min and 5 min: 9 000 samples in two long[] each, ~34 MB of heap, read only by /world perf.
+# One sample a second keeps the same windows with 300 samples.
+STORE_CLASS = "com/hypixel/hytale/component/Store.class"
+
 # putstatic #74 (instance); invokestatic #78 (Quic.ensureAvailability); bipush 25
 QUIC_CHECK = bytes.fromhex("b3004a" "b8004e" "1019")
 QUIC_CHECK_NOP = bytes.fromhex("b3004a" "000000" "1019")
@@ -74,11 +100,14 @@ def main() -> None:
                     raise SystemExit("Quic.ensureAvailability call not found once")
                 data = data.replace(QUIC_CHECK, QUIC_CHECK_NOP)
                 done.add(item.filename)
+            elif item.filename == STORE_CLASS:
+                data = rewrite_long(data, 33333333, 1000000000)
+                done.add(item.filename)
             elif item.filename in replacements:
                 data = replacements[item.filename]
                 done.add(item.filename)
             zout.writestr(item, data)
-    missing = (PATCHED_CLASSES | set(replacements) | {SERVER_CLASS}) - done
+    missing = (PATCHED_CLASSES | set(replacements) | {SERVER_CLASS, STORE_CLASS}) - done
     if missing:
         raise SystemExit(f"entries not found: {sorted(missing)}")
     print(f"wrote {dst}")

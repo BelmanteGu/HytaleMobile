@@ -18,8 +18,10 @@
 #     showed extra cycles for metaspace and code cache growth. So: no periodic GC, marking starts at a
 #     fixed 70% occupancy, and metaspace and code cache start large enough. The GC log is in
 #     files/server-gc.log.
-#   - Two GC threads, two JIT compiler threads and three common-pool workers, so the server does not
-#     wake every core at once.
+#   - Two GC threads, two JIT compiler threads, two common-pool workers, two Netty event loops and
+#     the processor count set to 3 (HYPRISM_SERVER_CPUS), so the server does not wake every core at
+#     once and world generation runs 3 workers instead of 6. HYPRISM_SERVER_GC=serial and
+#     HYPRISM_SERVER_JIT=c1 trade pauses or speed for memory and CPU (off by default).
 #   - The world ticks at HYPRISM_SERVER_TPS (default 20, the desktop server runs 30; systems scale by
 #     the tick's delta time), and the tick loop sleeps instead of spinning: the server busy-waits the
 #     last 3 ms of every tick ("sleep offset"), about a tenth of a core for the world thread alone.
@@ -53,14 +55,28 @@ while [ "$i" -lt "$n" ]; do
     i=$((i + 1))
 done
 
-opts="-XX:+UseG1GC -Xms512M -Xmx${HYPRISM_SERVER_HEAP:-1536M}"
-opts="$opts -XX:-G1UseAdaptiveIHOP -XX:InitiatingHeapOccupancyPercent=70 -XX:G1ReservePercent=10"
-# Chunk data arrays over half a region are "humongous" objects, which start marking cycles early and
-# waste the rest of their regions; with 1 MB regions the S23's GC log showed 60-90 of them.
-opts="$opts -XX:G1HeapRegionSize=4m"
-opts="$opts -XX:ParallelGCThreads=2 -XX:ConcGCThreads=1 -XX:MetaspaceSize=192m"
-opts="$opts -XX:CICompilerCount=2 -XX:ReservedCodeCacheSize=128m"
-opts="$opts -Djava.util.concurrent.ForkJoinPool.common.parallelism=3"
+if [ "${HYPRISM_SERVER_GC:-g1}" = serial ]; then
+    # Opt-in: no concurrent GC threads and ~50 MB less GC bookkeeping, but a full collection of a
+    # 600-800 MB heap stops the world server for a moment.
+    opts="-XX:+UseSerialGC -Xms256M -Xmx${HYPRISM_SERVER_HEAP:-1536M} -XX:MinHeapFreeRatio=10 -XX:MaxHeapFreeRatio=40"
+else
+    opts="-XX:+UseG1GC -Xms512M -Xmx${HYPRISM_SERVER_HEAP:-1536M}"
+    opts="$opts -XX:-G1UseAdaptiveIHOP -XX:InitiatingHeapOccupancyPercent=70 -XX:G1ReservePercent=10"
+    # Chunk data arrays over half a region are "humongous" objects, which start marking cycles early
+    # and waste the rest of their regions; with 1 MB regions the S23's GC log showed 60-90 of them.
+    opts="$opts -XX:G1HeapRegionSize=4m -XX:ParallelGCThreads=2 -XX:ConcGCThreads=1"
+fi
+# The server sizes its thread pools from the processor count: world generation takes
+# max(2, ceil(n * 0.75)) workers (6 on an 8-core phone). Three processors give 3 generation workers
+# and 12 fewer threads in all; 2 makes the worldgen v2 plugin build a pool of 0 and fail to start.
+opts="$opts -XX:ActiveProcessorCount=${HYPRISM_SERVER_CPUS:-3} -XX:MetaspaceSize=192m"
+opts="$opts -Djava.util.concurrent.ForkJoinPool.common.parallelism=2 -Dio.netty.eventLoopThreads=2"
+if [ "${HYPRISM_SERVER_JIT:-c2}" = c1 ]; then
+    # Opt-in: the quick compiler only (less compile CPU and code cache; compiled code runs slower).
+    opts="$opts -XX:TieredStopAtLevel=1 -XX:CICompilerCount=1 -XX:ReservedCodeCacheSize=48m"
+else
+    opts="$opts -XX:CICompilerCount=2 -XX:ReservedCodeCacheSize=96m"
+fi
 # The last two runs' GC log, to tell a busy world from a heap that is too small.
 opts="$opts -Xlog:gc*:file=$H/files/server-gc.log:time,uptime:filecount=2,filesize=4m"
 
