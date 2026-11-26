@@ -1,0 +1,39 @@
+# Rust server and performance plan
+
+Notes from the 26/11 planning session. Work happens on the `rust` branch; each item has a GitHub issue (labels `rust`, `performance`, `research`).
+
+## Languages (what the game files show)
+- **Server:** Java (`HytaleServer.jar`, run on OpenJDK 25 on the phone).
+- **Client:** C# / .NET, shipped as a NativeAOT macOS arm64 binary without source. Loaded by our Mach-O loader.
+- Both talk over QUIC.
+
+## Decision: server in Rust (branch `rust`)
+Why: the JVM server uses about 1 GB and has GC pauses and warm-up. A Rust server could use roughly 100 to 300 MB, less CPU and battery, and start faster. That is an estimate to confirm by measuring.
+
+Stages, each testable with the official client:
+1. Document the protocol the client expects (QUIC, handshake, login).
+2. Minimal server: the client joins an empty flat world.
+3. World: chunks, blocks, saving, terrain generation.
+4. Game: entities, NPCs, inventory, combat.
+5. Android packaging: arm64 build inside the APK in place of the JDK.
+
+Risks: the protocol changes with game updates; large scope (Minecraft ports to Rust took years and cover a subset). Start from the existing `hytale-server-rust` project (early, no single-player mode, about 1.1 GB at boot when last checked) instead of from zero.
+
+Legal: written authorization from the game's creator must be on file before rewriting from the server's code. It has not been verified here.
+
+## Decision: no Rust client
+The client is closed source. Rewriting it means redoing the renderer, UI, animation, audio and every asset format, and requires reverse engineering that the EULA (section 4.1(b)) forbids. The GPU, not the language, is the phone's bottleneck, so the gain is small. Revisit only if the official client stops working.
+
+## C# against Rust
+CPU time is usually within 1 to 2 times; memory is where Rust wins (no GC, no object headers). In the client most time goes to the GPU through OpenGL, so the language is not the bottleneck there. Not measured: confirm with the CPU/GPU split issue.
+
+## Client performance on Android (below the closed client)
+Today: client -> OpenGL -> MobileGlues (GL to GLES) -> Adreno driver. Only this layer and the loader are ours.
+- Vulkan (Zink or ANGLE-Vulkan): an extra layer on a path that is already short; expect equal or slower unless the GLES driver is the bottleneck. Experiment only.
+- Likely wins: profile the GPU, shader cache on disk, compressed textures (ASTC/ETC2), remove redundant work in the translation layer, quality option for expensive passes, frame pacing and CPU affinity.
+
+## Server optimization mod (Java plugin)
+Hytale supports server plugins. A plugin that limits view distance, throttles far entities and batches saves is a quick win and keeps compatibility; JVM flags can be tuned without a plugin. API not yet researched.
+
+## First step for everything
+Measure on the S23: server CPU, memory and GC; client CPU against GPU per frame. Decide from the numbers.
