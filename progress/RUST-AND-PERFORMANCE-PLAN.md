@@ -37,3 +37,11 @@ Hytale supports server plugins. A plugin that limits view distance, throttles fa
 
 ## First step for everything
 Measure on the S23: server CPU, memory and GC; client CPU against GPU per frame. Decide from the numbers.
+
+## Findings 26/11: the existing Rust server (DorianCen/hytale-server-rust, MIT)
+It is far ahead of the early notes above: about 339k lines, a real 0.7.7 client joins, moves, breaks and places blocks; protocol build 258; 1,577 fast tests. So the plan is to adopt it, not rewrite. Measured on the Mac with the installed game's Assets.zip (3.9 GB):
+- `--validate-assets`: 0 failures, 3m14s, peak 428 MB.
+- `serve` (insecure mode): listening after about 4 min (asset decode, NPC catalogs 12 s); idle footprint 719 MB (macOS `footprint`).
+- Cross-compile works: `cargo ndk -t arm64-v8a --platform 28 build --release --locked -p hytale-server` gives a 25 MB binary in 12 min; it runs on the S23 (`--version`, `--list-modules`).
+- Not measured: the Java server on the same machine and world (no fair comparison yet), the Rust server on the phone, a real client joining.
+Open problems: boot time and memory come from decoding all 54 asset stores up front (load lazily or cache a decoded form); the server wants an extracted asset tree (3.8 GB) besides Assets.zip, which the phone cannot hold (about 4.8 GB free): find the subset it reads (prefabs, environments, gradients); release clients need `--auth-mode authenticated` (session tokens through HYTALE_SERVER_SESSION_TOKEN / HYTALE_SERVER_IDENTITY_TOKEN).
