@@ -45,3 +45,14 @@ It is far ahead of the early notes above: about 339k lines, a real 0.7.7 client 
 - Cross-compile works: `cargo ndk -t arm64-v8a --platform 28 build --release --locked -p hytale-server` gives a 25 MB binary in 12 min; it runs on the S23 (`--version`, `--list-modules`).
 - Not measured: the Java server on the same machine and world (no fair comparison yet), the Rust server on the phone, a real client joining.
 Open problems: boot time and memory come from decoding all 54 asset stores up front (load lazily or cache a decoded form); the server wants an extracted asset tree (3.8 GB) besides Assets.zip, which the phone cannot hold (about 4.8 GB free): find the subset it reads (prefabs, environments, gradients); release clients need `--auth-mode authenticated` (session tokens through HYTALE_SERVER_SESSION_TOKEN / HYTALE_SERVER_IDENTITY_TOKEN).
+
+## Findings 26/11 (later): running the Rust server from the game on the S23
+Measured on the S23 (0.7.7 release, official profile):
+- Java server in a world: RSS 684 MB steady, peak (VmHWM) 1.4 GB, 178% CPU while booting and recording the AOT cache; boot about 10-20 s.
+- Rust server (`hytale-server-rust`, arm64 build, assets extracted to files/rust/assets: Server/ and Common/TintGradients, 2.2 GB): RSS 656-694 MB idle, peak 712-716 MB, 0% CPU idle; boot about 41-50 s (asset decode up front).
+- So the gain so far is peak memory and boot CPU; steady memory is about the same; boot is slower.
+Integration state (opt-in with `files/rust/enabled`, off by default):
+- `server/java` translates the client's command line (`--bind localhost:PORT` -> 127.0.0.1, `--assets=`), starts the Rust server with the session tokens it inherits (`using Hytale session tokens from the environment`, live auth OK) and relays its output; SIGTERM is passed on.
+- `ServerSetup` skips adapting the Java jar when Rust is enabled (the 0.8.0-pre.7 server jar no longer has the Quic.ensureAvailability call and broke the adapter).
+- OPEN: the client stays on "Booting server..." after the Rust server listens. Printing a line identical to Java's "Hytale Server Booted! [Singleplayer, Fresh Universe] took ..." (and the closing ==== line) does not move it, and the string "Booted" is not in the client binary, so the readiness check is something else. The client also writes to the server's stdin (killing the server gives "Broken pipe" in the client). Next experiment: record what the client writes to the Java server's stdin and what it expects back.
+- 0.8.0-pre.7 (build 83): the Mach-O loader segfaults inside HytaleClient (+0x3dcf78, null deref) right after start; not related to the server. To do after the comparison.

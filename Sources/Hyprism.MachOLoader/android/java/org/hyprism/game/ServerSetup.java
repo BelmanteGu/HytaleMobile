@@ -85,8 +85,16 @@ final class ServerSetup {
     void run() throws IOException {
         extractRuntime();
         installServerLauncher();
-        patchServerJar();
+        if (rustServerEnabled())
+            progress.report("Usando o servidor em Rust…");
+        else
+            patchServerJar();
         writeDefaults();
+    }
+
+    /** The Rust world server (branch rust) replaces the JVM when files/rust/enabled exists; no jar to adapt then. */
+    private boolean rustServerEnabled() {
+        return new File(files, "rust/enabled").isFile() && new File(files, "rust/hytale-server").isFile();
     }
 
     // ---- runtime ------------------------------------------------------------------------------

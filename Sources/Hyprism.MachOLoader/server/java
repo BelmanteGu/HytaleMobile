@@ -42,6 +42,48 @@ case "$0" in
     *) H=${HYPRISM_HOME:-/data/user/0/org.hyprism.game} ;;
 esac
 J=${HYPRISM_JDK:-$H/files/jdk}
+
+# Rust world server (branch rust, opt-in): when files/rust/enabled exists, the client's Java command
+# line is translated to the Rust server (files/rust/hytale-server) instead of starting the JVM.
+# HYPRISM_SERVER=java forces the Java server.
+if [ "${HYPRISM_SERVER:-}" != java ] && [ -f "$H/files/rust/enabled" ] && [ -x "$H/files/rust/hytale-server" ]; then
+    r_bind=127.0.0.1:5520
+    r_assets=
+    r_prev=
+    for r_a in "$@"; do
+        case "$r_a" in
+            --bind=*) r_bind=${r_a#--bind=} ;;
+            --assets=*) r_assets=${r_a#--assets=} ;;
+            *) case "$r_prev" in --bind) r_bind=$r_a ;; --assets) r_assets=$r_a ;; esac ;;
+        esac
+        r_prev=$r_a
+    done
+    # the client asks for localhost:PORT; the Rust server wants a numeric address
+    case "$r_bind" in localhost:*) r_bind=127.0.0.1:${r_bind#localhost:} ;; esac
+    R=$H/files/rust
+    # The client waits for "Hytale Server Booted!" in the server's output before it connects, so the
+    # Rust server's output is relayed and that line is added once it listens. SIGTERM (the client's
+    # exit, RestartActivity) is passed on so the world is saved.
+    fifo=$H/files/rust-server.out
+    rm -f "$fifo" "$fifo.in"
+    mkfifo "$fifo" "$fifo.in"
+    tee "$H/files/rust-stdin.log" > "$fifo.in" &
+    "$R/hytale-server" serve --universe "$PWD/universe" --assets-pack "$r_assets" \
+        --assets-root "$R/assets" --world-data "$R/worlddata" --bind "$r_bind" \
+        --auth-mode authenticated < "$fifo.in" > "$fifo" 2>&1 &
+    r_pid=$!
+    trap 'kill $r_pid 2>/dev/null' TERM INT HUP
+    (
+        while IFS= read -r r_line; do
+            echo "$r_line"
+            case "$r_line" in
+                *"serve listening"*) echo "[$(date '+%Y/%m/%d %H:%M:%S')   INFO]                   [HytaleServer]          Hytale Server Booted! [Singleplayer, Fresh Universe] took 1sec 0ms 0us 0ns" ;;
+            esac
+        done < "$fifo"
+    ) &
+    wait $r_pid
+    exit $?
+fi
 A=$H/files/aot
 CPUS=${HYPRISM_SYSFS_CPU:-/sys/devices/system/cpu}
 
