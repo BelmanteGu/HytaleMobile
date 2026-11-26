@@ -61,23 +61,23 @@ if [ "${HYPRISM_SERVER:-}" != java ] && [ -f "$H/files/rust/enabled" ] && [ -x "
     # the client asks for localhost:PORT; the Rust server wants a numeric address
     case "$r_bind" in localhost:*) r_bind=127.0.0.1:${r_bind#localhost:} ;; esac
     R=$H/files/rust
-    # The client waits for "Hytale Server Booted!" in the server's output before it connects, so the
-    # Rust server's output is relayed and that line is added once it listens. SIGTERM (the client's
-    # exit, RestartActivity) is passed on so the world is saved.
+    # In singleplayer the client connects when the server writes the raw line ">> Singleplayer Ready <<"
+    # (HytaleServer.sendSingleplayerSignal -> HytaleLoggerBackend.rawLog); progress lines are
+    # "-=|<message json>|<percent>". The Rust server's output is relayed and the ready line added once it
+    # listens. SIGTERM (the client's exit, RestartActivity) is passed on so the world is saved.
     fifo=$H/files/rust-server.out
-    rm -f "$fifo" "$fifo.in"
-    mkfifo "$fifo" "$fifo.in"
-    tee "$H/files/rust-stdin.log" > "$fifo.in" &
+    rm -f "$fifo"
+    mkfifo "$fifo"
     "$R/hytale-server" serve --universe "$PWD/universe" --assets-pack "$r_assets" \
         --assets-root "$R/assets" --world-data "$R/worlddata" --bind "$r_bind" \
-        --auth-mode authenticated < "$fifo.in" > "$fifo" 2>&1 &
+        --auth-mode authenticated --workers 4 > "$fifo" 2>&1 &
     r_pid=$!
     trap 'kill $r_pid 2>/dev/null' TERM INT HUP
     (
         while IFS= read -r r_line; do
             echo "$r_line"
             case "$r_line" in
-                *"serve listening"*) echo "[$(date '+%Y/%m/%d %H:%M:%S')   INFO]                   [HytaleServer]          Hytale Server Booted! [Singleplayer, Fresh Universe] took 1sec 0ms 0us 0ns" ;;
+                *"serve listening"*) echo ">> Singleplayer Ready <<" ;;
             esac
         done < "$fifo"
     ) &

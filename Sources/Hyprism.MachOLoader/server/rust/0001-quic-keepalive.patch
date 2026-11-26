@@ -1,0 +1,22 @@
+diff --git a/crates/hytale-net/src/transport.rs b/crates/hytale-net/src/transport.rs
+index 52a12f8..c3588b5 100644
+--- a/crates/hytale-net/src/transport.rs
++++ b/crates/hytale-net/src/transport.rs
+@@ -267,7 +267,16 @@ impl ServerEndpointBuilder {
+         tls.alpn_protocols = self.alpn_protocols.clone();
+ 
+         let quic = QuicServerConfig::try_from(tls)?;
+-        Ok(quinn::ServerConfig::with_crypto(Arc::new(quic)))
++        let mut config = quinn::ServerConfig::with_crypto(Arc::new(quic));
++        // Keep the connection alive while the world thread is busy (spawn generation on a phone can
++        // take longer than the client's idle timeout, and the client then drops a silent connection).
++        let mut transport = quinn::TransportConfig::default();
++        transport.keep_alive_interval(Some(std::time::Duration::from_secs(5)));
++        if let Ok(idle) = quinn::IdleTimeout::try_from(std::time::Duration::from_secs(60)) {
++            transport.max_idle_timeout(Some(idle));
++        }
++        config.transport_config(Arc::new(transport));
++        Ok(config)
+     }
+ }
+ 
