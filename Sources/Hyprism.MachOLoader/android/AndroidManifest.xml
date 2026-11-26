@@ -32,5 +32,11 @@ SPDX-License-Identifier: GPL-3.0-only
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
     </activity>
+    <!-- Started by the launcher's "Pre-generate world" instance action. -->
+    <activity android:name="org.hyprism.game.PregenerateActivity"
+        android:exported="true"
+        android:label="Pré-gerar mundo"
+        android:screenOrientation="sensorLandscape"
+        android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen" />
   </application>
 </manifest>

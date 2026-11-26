@@ -78,3 +78,14 @@ JNIEXPORT void JNICALL Java_org_hyprism_game_GamepadOverlay_nativeButton(JNIEnv 
     if (g_joystick)
         SDL_SetJoystickVirtualButton(g_joystick, button, down);
 }
+
+// True while the game owns the pointer (relative mouse mode or a hidden cursor), that is during play.
+// In menus and modals the cursor is visible, and GamepadOverlay lets touches through as plain input.
+JNIEXPORT jboolean JNICALL Java_org_hyprism_game_GamepadOverlay_nativeCaptured(JNIEnv *env, jclass cls)
+{
+    (void)env; (void)cls;
+    SDL_Window *window = SDL_GetKeyboardFocus();
+    if (window && SDL_GetWindowRelativeMouseMode(window))
+        return JNI_TRUE;
+    return SDL_CursorVisible() ? JNI_FALSE : JNI_TRUE;
+}

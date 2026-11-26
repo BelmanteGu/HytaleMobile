@@ -335,7 +335,7 @@ public partial class InstanceRepository : IInstanceRepository
             string basePath = string.IsNullOrEmpty(sub) ? versionPath : Path.Combine(versionPath, sub);
             string clientPath;
 
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            if (LauncherUtilities.UsesMacClient)
             {
                 clientPath = Path.Combine(basePath, "Client", "Hytale.app", "Contents", "MacOS", "HytaleClient");
             }
@@ -366,7 +366,7 @@ public partial class InstanceRepository : IInstanceRepository
     public bool AreAssetsPresent(string versionPath)
     {
         string assetsCheck;
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        if (LauncherUtilities.UsesMacClient)
         {
             assetsCheck = Path.Combine(versionPath, "Client", "Hytale.app", "Contents", "Assets");
         }
@@ -512,7 +512,7 @@ public partial class InstanceRepository : IInstanceRepository
 
             if (Directory.Exists(versionPath))
             {
-                Directory.Delete(versionPath, true);
+                DeleteInstanceFolder(versionPath);
             }
 
             SyncInstancesWithConfig();
@@ -523,6 +523,35 @@ public partial class InstanceRepository : IInstanceRepository
             Logger.Error("Game", $"Error deleting game: {ex.Message}");
             return false;
         }
+    }
+
+    /// <summary>
+    /// Removes an instance folder. An instance that is a link to a folder it does not own (the game's
+    /// own files folder on Android, which also holds the player's worlds) loses only the game build:
+    /// the client, the server, the assets and the instance metadata, then the link itself.
+    /// </summary>
+    private static void DeleteInstanceFolder(string path)
+    {
+        if (new DirectoryInfo(path).LinkTarget is null)
+        {
+            Directory.Delete(path, true);
+            return;
+        }
+
+        foreach (var name in new[] { "Client", "Server", "staging-temp" })
+        {
+            var dir = Path.Combine(path, name);
+            if (Directory.Exists(dir))
+                Directory.Delete(dir, true);
+        }
+        foreach (var name in new[] { "Assets.zip", "Meta.json" })
+        {
+            var file = Path.Combine(path, name);
+            if (File.Exists(file))
+                File.Delete(file);
+        }
+        File.Delete(path);
+        Logger.Info("InstanceRepository", $"Removed the game build from {path}; the worlds in UserData were kept");
     }
 
     /// <summary>
@@ -549,7 +578,7 @@ public partial class InstanceRepository : IInstanceRepository
                     !string.Equals(instance.Id, instanceId, StringComparison.OrdinalIgnoreCase));
             }
 
-            Directory.Delete(versionPath, true);
+            DeleteInstanceFolder(versionPath);
 
             SyncInstancesWithConfig();
             return true;
@@ -626,15 +655,19 @@ public partial class InstanceRepository : IInstanceRepository
             var userDataPath = Path.Combine(folder, "UserData");
             bool hasUserData = Directory.Exists(userDataPath);
             long size = 0;
-            if (hasUserData)
+            // On Android the instance is the game's files folder on shared storage, where walking tens
+            // of thousands of files (the client bundle, worlds) takes minutes; sizes stay unknown there.
+            bool measure = !OperatingSystem.IsAndroid();
+            if (hasUserData && measure)
             {
                 try { size = new DirectoryInfo(userDataPath).EnumerateFiles("*", SearchOption.AllDirectories).Sum(fi => fi.Length); }
                 catch { }
             }
 
             long totalSize = 0;
-            try { totalSize = new DirectoryInfo(folder).EnumerateFiles("*", SearchOption.AllDirectories).Sum(fi => fi.Length); }
-            catch { }
+            if (measure)
+                try { totalSize = new DirectoryInfo(folder).EnumerateFiles("*", SearchOption.AllDirectories).Sum(fi => fi.Length); }
+                catch { }
 
             if (string.IsNullOrEmpty(instanceId))
             {
@@ -807,7 +840,7 @@ public partial class InstanceRepository : IInstanceRepository
     private static bool CheckExecutablePresent(string folder)
     {
         string clientPath;
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        if (LauncherUtilities.UsesMacClient)
         {
             clientPath = Path.Combine(folder, "Client", "Hytale.app", "Contents", "MacOS", "HytaleClient");
         }
@@ -828,7 +861,7 @@ public partial class InstanceRepository : IInstanceRepository
     private static bool CheckAssetsPresent(string folder)
     {
         string assetsPath;
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        if (LauncherUtilities.UsesMacClient)
         {
             assetsPath = Path.Combine(folder, "Client", "Hytale.app", "Contents", "Assets");
         }
@@ -863,7 +896,7 @@ public partial class InstanceRepository : IInstanceRepository
     /// </summary>
     private static bool CheckLibrariesPresent(string folder)
     {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        if (LauncherUtilities.UsesMacClient)
         {
             var frameworksPath = Path.Combine(folder, "Client", "Hytale.app", "Contents", "Frameworks");
             if (Directory.Exists(frameworksPath))
@@ -908,7 +941,7 @@ public partial class InstanceRepository : IInstanceRepository
             Path.Combine(folder, "Client", "level0"),
         };
 
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        if (LauncherUtilities.UsesMacClient)
         {
             var dataPath = Path.Combine(folder, "Client", "Hytale.app", "Contents", "Data");
             return Directory.Exists(dataPath);
@@ -920,7 +953,7 @@ public partial class InstanceRepository : IInstanceRepository
 
     private static bool CheckInstanceValidity(string folder)
     {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        if (LauncherUtilities.UsesMacClient)
         {
             return File.Exists(Path.Combine(folder, "Client", "Hytale.app", "Contents", "MacOS", "HytaleClient"));
         }

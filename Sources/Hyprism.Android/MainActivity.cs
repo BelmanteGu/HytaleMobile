@@ -14,6 +14,9 @@ namespace Hyprism.Desktop.Android;
     Theme = "@style/HyprismTheme.NoActionBar",
     Icon = "@drawable/icon",
     MainLauncher = true,
+    // One launcher window: a second one (opened from the icon or a notification while the first
+    // lives) would take the shared view, which Avalonia refuses.
+    LaunchMode = LaunchMode.SingleTask,
     ScreenOrientation = ScreenOrientation.SensorLandscape,
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode)]
 public sealed class MainActivity : AvaloniaMainActivity

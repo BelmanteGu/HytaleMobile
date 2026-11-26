@@ -8,6 +8,7 @@ SPDX-License-Identifier: GPL-3.0-only
              xmlns:instances="using:Hyprism.Desktop.Screens.Instances"
              xmlns:controls="using:Hyprism.Desktop.Controls"
              xmlns:easing="using:Avalonia.Animation.Easings"
+             xmlns:platform="using:Hyprism.Desktop.Platform"
              x:Class="Hyprism.Desktop.Screens.Instances.InstanceListView"
              x:Name="InstanceListRoot"
              x:DataType="instances:InstancesViewModel">
@@ -110,6 +111,15 @@ SPDX-License-Identifier: GPL-3.0-only
                                 <StackPanel Orientation="Horizontal" Spacing="10">
                                   <Path Classes="managerCompactMenuIcon" Data="{StaticResource FolderOpenIcon}" />
                                   <TextBlock Text="{Binding DataContext.ManagedInstanceOpenFolderLabel, ElementName=InstanceListRoot}"
+                                             VerticalAlignment="Center" />
+                                </StackPanel>
+                              </Button>
+                              <Button Classes="managerCompactMenuAction"
+                                      IsVisible="{x:Static platform:PlatformActions.CanPregenerateWorld}"
+                                      Click="OnPregenerateWorldMenuClicked">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                  <Path Classes="managerCompactMenuIcon" Data="{StaticResource InstancesIcon}" />
+                                  <TextBlock Text="{x:Static platform:PlatformActions.PregenerateWorldLabel}"
                                              VerticalAlignment="Center" />
                                 </StackPanel>
                               </Button>

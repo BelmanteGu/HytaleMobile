@@ -2,11 +2,52 @@
 <!--
 Copyright (C) 2026 Hyprism Launcher
 SPDX-License-Identifier: GPL-3.0-only
+
+The launcher and the game in one app. The game activities run in the ":game" process (see
+HyprismApplication.java). Target SDK 28: newer targets forbid executing files from the app's data
+folder, and the game starts its local world server with the Java runtime extracted there.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" android:installLocation="auto">
+  <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="28" />
+  <uses-feature android:glEsVersion="0x00030002" />
+  <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+  <uses-feature android:name="android.hardware.gamepad" android:required="false" />
   <uses-permission android:name="android.permission.INTERNET" />
-  <queries>
-    <package android:name="org.hyprism.game" />
-  </queries>
-  <application android:label="Hyprism" android:icon="@drawable/Icon" />
+  <uses-permission android:name="android.permission.VIBRATE" />
+  <application android:name="org.hyprism.game.HyprismApplication"
+      android:label="Hytale"
+      android:icon="@drawable/Icon"
+      android:appCategory="game"
+      android:hardwareAccelerated="true"
+      android:extractNativeLibs="true"
+      android:debuggable="true">
+    <activity android:name="org.hyprism.game.SetupActivity"
+        android:process=":game"
+        android:exported="false"
+        android:screenOrientation="sensorLandscape"
+        android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen" />
+    <activity android:name="org.hyprism.game.HytaleActivity"
+        android:process=":game"
+        android:exported="false"
+        android:label="Hytale"
+        android:launchMode="singleInstance"
+        android:screenOrientation="sensorLandscape"
+        android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+        android:configChanges="layoutDirection|locale|grammaticalGender|fontScale|fontWeightAdjustment|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation"
+        android:preferMinimalPostProcessing="true" />
+    <!-- Restarts the game from the in-game settings panel; its own process, so it can end the game's. -->
+    <activity android:name="org.hyprism.game.RestartActivity"
+        android:process=":restart"
+        android:exported="false"
+        android:excludeFromRecents="true"
+        android:screenOrientation="sensorLandscape"
+        android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen" />
+    <!-- Started by the launcher's "Pre-generate world" instance action. -->
+    <activity android:name="org.hyprism.game.PregenerateActivity"
+        android:process=":game"
+        android:exported="false"
+        android:label="Pré-gerar mundo"
+        android:screenOrientation="sensorLandscape"
+        android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen" />
+  </application>
 </manifest>

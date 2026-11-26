@@ -3,6 +3,7 @@
 
 package org.hyprism.game;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.util.Log;
@@ -15,13 +16,10 @@ import android.widget.Toast;
 import org.libsdl.app.SDLActivity;
 
 import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
-import java.util.Arrays;
 
 /**
  * Hosts the macOS Hytale client, loaded natively by libmain.so. The Hyprism
@@ -29,10 +27,36 @@ import java.util.Arrays;
  */
 public class HytaleActivity extends SDLActivity {
     static final String ARGUMENTS_EXTRA = "org.hyprism.game.ARGUMENTS";
+    /** The launcher instance to run; libmain.so reads it as HYPRISM_GAME_DIR (default: the files folder). */
+    static final String GAME_DIR_EXTRA = "org.hyprism.game.GAME_DIR";
+    private boolean batterySaver;
+    private GameSettingsPanel settingsPanel;
+    private static volatile boolean running;
+
+    /** Whether the game is open, so the world must not be pre-generated now. */
+    static boolean isRunning() {
+        return running;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        String gameDir = getIntent() != null ? getIntent().getStringExtra(GAME_DIR_EXTRA) : null;
+        try {
+            if (gameDir != null)
+                android.system.Os.setenv("HYPRISM_GAME_DIR", gameDir, true);
+            else
+                android.system.Os.unsetenv("HYPRISM_GAME_DIR");
+        } catch (android.system.ErrnoException e) {
+            Log.w("HytaleHost", "could not pass the game folder: " + e);
+        }
+        // The phone options come from the in-game panel (GameSettingsPanel).
+        GameSettings.snapshot(this);
+        batterySaver = GameSettings.batterySaver(this);
+        setEnv("HYPRISM_TEXTURE_HALF", GameSettings.halfTextures(this) ? "1" : null);
+        setEnv("HYPRISM_SWAP_INTERVAL", null);
         super.onCreate(savedInstanceState);
+        running = true;
+        clearLeftoverPregeneration();
         // Draw under the camera cutout instead of leaving a black bar.
         getWindow().getAttributes().layoutInDisplayCutoutMode =
             WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
@@ -46,6 +70,38 @@ public class HytaleActivity extends SDLActivity {
         addContentView(gamepad, new ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         gamepad.postDelayed(gamepad::restore, 15000);
+
+        // The settings panel sits above the controls; the gear in their top bar opens it.
+        settingsPanel = new GameSettingsPanel(this, gamepad);
+        addContentView(settingsPanel, new ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        gamepad.setOnOpenSettings(settingsPanel::show);
+    }
+
+    /**
+     * Restarts the game, to apply the options that are read at start. RestartActivity (another process)
+     * stops the world server so it saves, ends this process and starts SetupActivity again with the same
+     * extras, which carry the account's session.
+     */
+    void restartGame() {
+        Intent next = new Intent(this, SetupActivity.class);
+        if (getIntent() != null && getIntent().getExtras() != null)
+            next.putExtras(getIntent().getExtras());
+        next.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        Intent restart = new Intent(this, RestartActivity.class);
+        restart.putExtra(RestartActivity.PID_EXTRA, android.os.Process.myPid());
+        restart.putExtra(RestartActivity.NEXT_EXTRA, next);
+        restart.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(restart);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (settingsPanel != null && settingsPanel.isOpen()) {
+            settingsPanel.hide();
+            return;
+        }
+        super.onBackPressed();
     }
 
     /**
@@ -71,7 +127,9 @@ public class HytaleActivity extends SDLActivity {
         } catch (NumberFormatException e) {
             Log.w("HytaleHost", "ignoring a bad HYPRISM_REFRESH: " + e.getMessage());
         }
-        if (hz > 0) {
+        if (batterySaver)
+            applyBatterySaver();
+        else if (hz > 0) {
             WindowManager.LayoutParams attributes = getWindow().getAttributes();
             attributes.preferredRefreshRate = hz;
             getWindow().setAttributes(attributes);
@@ -92,27 +150,84 @@ public class HytaleActivity extends SDLActivity {
     }
 
     /**
-     * Writes the world server launcher (server/java, shipped in the APK's assets) to files/java,
-     * where args.txt points the client, so a new APK brings its JVM settings without reinstalling
-     * the server runtime. It runs before the client starts and only rewrites a changed file.
+     * Battery mode: a display mode between 40 and 50 Hz when the panel has one (VSync then paces the
+     * game there, smoothly), otherwise every other refresh of a 60 Hz mode, 30 FPS.
      */
+    private void applyBatterySaver() {
+        android.view.Display display = getWindowManager().getDefaultDisplay();
+        android.view.Display.Mode current = display.getMode();
+        android.view.Display.Mode best = null, sixty = null;
+        for (android.view.Display.Mode mode : display.getSupportedModes()) {
+            if (mode.getPhysicalWidth() != current.getPhysicalWidth() || mode.getPhysicalHeight() != current.getPhysicalHeight())
+                continue;
+            float rate = mode.getRefreshRate();
+            if (rate >= 40 && rate <= 50 && (best == null || rate < best.getRefreshRate()))
+                best = mode;
+            if (Math.abs(rate - 60) < 1)
+                sixty = mode;
+        }
+        WindowManager.LayoutParams attributes = getWindow().getAttributes();
+        if (best != null) {
+            attributes.preferredDisplayModeId = best.getModeId();
+            Log.i("HytaleHost", "battery mode: display at " + best.getRefreshRate() + " Hz");
+        } else {
+            if (sixty != null)
+                attributes.preferredDisplayModeId = sixty.getModeId();
+            attributes.preferredRefreshRate = 60f;
+            setEnv("HYPRISM_SWAP_INTERVAL", "2");
+            Log.i("HytaleHost", "battery mode: 30 FPS (no display mode near 45 Hz)");
+        }
+        getWindow().setAttributes(attributes);
+    }
+
+    private static void setEnv(String name, String value) {
+        try {
+            if (value != null)
+                android.system.Os.setenv(name, value, true);
+            else
+                android.system.Os.unsetenv(name);
+        } catch (android.system.ErrnoException e) {
+            Log.w("HytaleHost", "could not set " + name + ": " + e);
+        }
+    }
+
+    /** Brings files/java up to date when the game is opened without SetupActivity (adb, old shortcuts). */
     private void installServerLauncher() {
-        File target = new File(getFilesDir(), "java");
-        try (InputStream in = getAssets().open("java")) {
-            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-            byte[] buffer = new byte[8192];
-            for (int n; (n = in.read(buffer)) > 0; )
-                bytes.write(buffer, 0, n);
-            byte[] wanted = bytes.toByteArray();
-            if (target.isFile() && Arrays.equals(Files.readAllBytes(target.toPath()), wanted))
-                return;
-            File tmp = new File(getFilesDir(), "java.tmp");
-            Files.write(tmp.toPath(), wanted);
-            if (!tmp.setExecutable(true, true) || !tmp.renameTo(target))
-                throw new IOException("could not replace " + target);
-            Log.i("HytaleHost", "installed the world server launcher");
-        } catch (IOException e) {
-            Log.w("HytaleHost", "world server launcher not updated: " + e);
+        new ServerSetup(this, message -> { }).installServerLauncher();
+    }
+
+    @Override
+    protected void onDestroy() {
+        running = false;
+        super.onDestroy();
+    }
+
+    /**
+     * PregenerateActivity sets ChunkConfig.PregenerateRegion only while it runs; if it was killed, the
+     * region would stay and the server would generate it during play. Remove any that was left.
+     */
+    private void clearLeftoverPregeneration() {
+        File[] saves = new File(getExternalFilesDir(null), "UserData/Saves").listFiles();
+        if (saves == null)
+            return;
+        for (File save : saves) {
+            File config = new File(save, "universe/worlds/default/config.json");
+            try {
+                if (!config.isFile())
+                    continue;
+                String text = new String(Files.readAllBytes(config.toPath()), java.nio.charset.StandardCharsets.UTF_8);
+                if (!text.contains("PregenerateRegion"))
+                    continue;
+                org.json.JSONObject json = new org.json.JSONObject(text);
+                org.json.JSONObject chunk = json.optJSONObject("ChunkConfig");
+                if (chunk != null) {
+                    chunk.remove("PregenerateRegion");
+                    Files.write(config.toPath(), json.toString(2).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    Log.i("HytaleHost", "removed a leftover pre-generation region from " + save.getName());
+                }
+            } catch (Exception e) {
+                Log.w("HytaleHost", "could not check " + config + ": " + e);
+            }
         }
     }
 

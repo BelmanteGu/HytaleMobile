@@ -147,10 +147,19 @@ public sealed partial class InstancesViewModel
 
         try
         {
-            // Watch the instance so creating UserData/Saves is observed too.
-            _worldsWatcher = new FileSystemWatcher(path)
+            // Watch the instance so creating UserData/Saves is observed too. On Android the instance is
+            // the game's own folder, whose caches hold tens of thousands of folders on shared storage:
+            // watching them all blocks the launcher for minutes, so only the worlds folder is watched.
+            var watchAll = !OperatingSystem.IsAndroid();
+            var watchPath = path;
+            if (!watchAll)
             {
-                IncludeSubdirectories = true,
+                watchPath = Path.Combine(path, "UserData", "Saves");
+                Directory.CreateDirectory(watchPath);
+            }
+            _worldsWatcher = new FileSystemWatcher(watchPath)
+            {
+                IncludeSubdirectories = watchAll,
                 NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName |
                                NotifyFilters.LastWrite | NotifyFilters.Size
             };

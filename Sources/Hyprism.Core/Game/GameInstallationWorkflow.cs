@@ -180,6 +180,18 @@ public class GameInstallationWorkflow : IGameInstallationWorkflow
             if (versions.Count == 0)
                 return new DownloadProgress { Error = "No versions available for this branch" };
 
+            if (!versions.Contains(targetVersion) && OperatingSystem.IsAndroid() && !gameIsInstalled && instanceMeta is not null)
+            {
+                // The official servers offer a fresh install of the latest build only; the Android
+                // instance starts on the build the loader was tested with, so a new phone takes the
+                // newest one instead of failing.
+                var latest = versions.Max();
+                Logger.Warning("Download", $"v{targetVersion} is no longer offered for {branch}; installing v{latest}");
+                targetVersion = latest;
+                instanceMeta.Version = latest;
+                _instances.SaveInstanceMeta(versionPath, instanceMeta);
+            }
+
             if (!versions.Contains(targetVersion))
                 return new DownloadProgress { Error = $"Selected version v{targetVersion} is not available for branch {branch}" };
 

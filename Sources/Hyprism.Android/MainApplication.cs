@@ -10,10 +10,12 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Hyprism.Desktop.Android;
 
-[Application]
-public sealed class MainApplication : AvaloniaAndroidApplication<App>
+// The manifest names org.hyprism.game.HyprismApplication (Java/), a subclass that skips .NET in the
+// game's process; this class has a fixed Java name for it to extend.
+[Register("org/hyprism/launcher/MainApplication")]
+public class MainApplication : AvaloniaAndroidApplication<App>
 {
-    private MainApplication(nint javaReference, JniHandleOwnership transfer)
+    protected MainApplication(nint javaReference, JniHandleOwnership transfer)
         : base(javaReference, transfer)
     {
     }
@@ -28,6 +30,17 @@ public sealed class MainApplication : AvaloniaAndroidApplication<App>
         // The launcher log goes to Console.Out, which Android drops; send it to logcat (tag Hyprism) so a
         // failed login or token refresh can be read with adb logcat -s Hyprism. LauncherStartup captures it.
         Console.SetOut(new LogcatWriter());
+        Hyprism.Desktop.Platform.PlatformActions.PregenerateWorld = () =>
+        {
+            var context = global::Android.App.Application.Context;
+            var intent = new global::Android.Content.Intent();
+            intent.SetComponent(new global::Android.Content.ComponentName(
+                context.PackageName!, "org.hyprism.game.PregenerateActivity"));
+            intent.AddFlags(global::Android.Content.ActivityFlags.NewTask);
+            context.StartActivity(intent);
+        };
+        Hyprism.Core.Game.Patching.ButlerClient.BundledButlerPath =
+            System.IO.Path.Combine(ApplicationInfo!.NativeLibraryDir!, "libpwrapply.so");
         AndroidGameHost.EnsureHostInstance();
         LauncherStartup.Initialize(services =>
         {

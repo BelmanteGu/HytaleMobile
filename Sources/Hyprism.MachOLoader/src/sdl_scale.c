@@ -144,13 +144,87 @@ static void scale_event(SDL_Event *e)
     }
 }
 
+// SDL turns every touch into mouse input, and a list cannot be scrolled with that. While two fingers
+// are down, their motion becomes mouse wheel events and the synthetic mouse events are dropped.
+// Fingers only reach SDL in menus: GamepadOverlay consumes the touches during play.
+static SDL_FingerID g_fingers[8];
+static int g_finger_count;
+// The first finger's touch already pressed the left mouse button; when a second finger lands (a scroll
+// begins) that press is released, so the game does not start dragging an item or a slider.
+static bool g_release_press;
+
+static void track_fingers(const SDL_Event *e)
+{
+    if (e->type == SDL_EVENT_WINDOW_FOCUS_LOST) {
+        g_finger_count = 0; // the lifts of fingers that were down are not delivered
+    } else if (e->type == SDL_EVENT_FINGER_DOWN) {
+        if (g_finger_count < 8)
+            g_fingers[g_finger_count++] = e->tfinger.fingerID;
+        if (g_finger_count == 2)
+            g_release_press = true;
+    } else if (e->type == SDL_EVENT_FINGER_UP || e->type == SDL_EVENT_FINGER_CANCELED) {
+        for (int i = 0; i < g_finger_count; i++) {
+            if (g_fingers[i] == e->tfinger.fingerID) {
+                g_fingers[i] = g_fingers[--g_finger_count];
+                break;
+            }
+        }
+    }
+}
+
 static bool w_PollEvent(SDL_Event *event)
 {
     REAL(SDL_PollEvent);
-    bool got = real_SDL_PollEvent(event);
-    if (got && event)
+    REAL(SDL_GetMouseState);
+    REAL(SDL_GetTicksNS);
+    if (g_release_press && event) {
+        REAL(SDL_GetKeyboardFocus);
+        REAL(SDL_GetWindowID);
+        g_release_press = false;
+        SDL_Window *focus = real_SDL_GetKeyboardFocus();
+        float mx = 0, my = 0;
+        real_SDL_GetMouseState(&mx, &my);
+        memset(event, 0, sizeof(*event));
+        event->type = SDL_EVENT_MOUSE_BUTTON_UP;
+        event->button.timestamp = real_SDL_GetTicksNS();
+        event->button.windowID = focus ? real_SDL_GetWindowID(focus) : 0;
+        event->button.which = SDL_TOUCH_MOUSEID;
+        event->button.button = SDL_BUTTON_LEFT;
+        event->button.down = false;
+        event->button.clicks = 1;
+        event->button.x = mx;
+        event->button.y = my;
         scale_event(event);
-    return got;
+        return true;
+    }
+    while (real_SDL_PollEvent(event)) {
+        if (!event)
+            return true;
+        track_fingers(event);
+        if (g_finger_count >= 2) {
+            bool mouse = event->type == SDL_EVENT_MOUSE_MOTION || event->type == SDL_EVENT_MOUSE_BUTTON_DOWN
+                || event->type == SDL_EVENT_MOUSE_BUTTON_UP;
+            if (mouse && event->motion.which == SDL_TOUCH_MOUSEID)
+                continue;
+            if (event->type == SDL_EVENT_FINGER_MOTION) {
+                float mx = 0, my = 0, dy = event->tfinger.dy;
+                SDL_WindowID window = event->tfinger.windowID;
+                real_SDL_GetMouseState(&mx, &my);
+                memset(event, 0, sizeof(*event));
+                event->type = SDL_EVENT_MOUSE_WHEEL;
+                event->wheel.timestamp = real_SDL_GetTicksNS();
+                event->wheel.windowID = window;
+                event->wheel.which = SDL_TOUCH_MOUSEID;
+                event->wheel.y = dy * 6.0f; // two fingers move, so a swipe over half the screen is 6 notches
+                event->wheel.direction = SDL_MOUSEWHEEL_NORMAL;
+                event->wheel.mouse_x = mx;
+                event->wheel.mouse_y = my;
+            }
+        }
+        scale_event(event);
+        return true;
+    }
+    return false;
 }
 
 static const struct { const char *name; void *fn; } k_wrappers[] = {
@@ -184,9 +258,17 @@ static SDL_FunctionPointer w_GL_GetProcAddress(const char *proc)
 /// Returns a wrapper for an SDL entry point, or NULL to use SDL directly.
 // HYPRISM_PERF=1 logs the frame rate every two seconds: frames per second, the average and worst
 // interval between buffer swaps, and how long SDL_GL_SwapWindow blocked (waiting for the GPU or vsync).
+void gl_tune_frame(void);
+
 static bool w_GL_SwapWindow(SDL_Window *window)
 {
     REAL(SDL_GL_SwapWindow);
+    gl_tune_frame();
+    static int perf = -1;
+    if (perf < 0)
+        perf = getenv("HYPRISM_PERF") != NULL;
+    if (!perf)
+        return real_SDL_GL_SwapWindow(window);
     static struct timespec last, window_start;
     static unsigned frames;
     static double sum_interval, max_interval, sum_swap;
@@ -231,7 +313,33 @@ static bool w_GL_SetSwapInterval(int interval)
             macho_log("sdl", "forcing VSync on (the client asked for an uncapped frame rate)");
         interval = 1;
     }
+    // HYPRISM_SWAP_INTERVAL=2 presents every other refresh (30 FPS on a 60 Hz panel): the battery
+    // mode on a display without a mode near 45 Hz.
+    const char *every = getenv("HYPRISM_SWAP_INTERVAL");
+    if (every && atoi(every) >= 1 && interval != 0) {
+        static int logged;
+        if (!logged++)
+            macho_log("sdl", "presenting every %d display refreshes (HYPRISM_SWAP_INTERVAL)", atoi(every));
+        interval = atoi(every);
+    }
     return real_SDL_GL_SetSwapInterval(interval);
+}
+
+// HYPRISM_CONTENT_SCALE=<x> makes SDL_GetDisplayContentScale answer x. The client imports it and keeps
+// a UiScale of its own; this is a way to see whether the interface follows the display's content scale
+// (an experiment for a larger HUD, off by default).
+static float w_GetDisplayContentScale(SDL_DisplayID display)
+{
+    REAL(SDL_GetDisplayContentScale);
+    const char *env = getenv("HYPRISM_CONTENT_SCALE");
+    float real = real_SDL_GetDisplayContentScale(display);
+    if (env && atof(env) > 0) {
+        static int logged;
+        if (!logged++)
+            macho_log("sdl", "display content scale %.2f reported as %.2f (HYPRISM_CONTENT_SCALE)", real, atof(env));
+        return (float)atof(env);
+    }
+    return real;
 }
 
 void *sdl_scale_lookup(void *sdl_handle, const char *symbol)
@@ -248,8 +356,10 @@ void *sdl_scale_lookup(void *sdl_handle, const char *symbol)
         return (void *)w_GL_GetProcAddress;
     if (strcmp(symbol, "SDL_GL_SetSwapInterval") == 0)
         return (void *)w_GL_SetSwapInterval;
-    if (strcmp(symbol, "SDL_GL_SwapWindow") == 0 && getenv("HYPRISM_PERF"))
+    if (strcmp(symbol, "SDL_GL_SwapWindow") == 0 && (getenv("HYPRISM_PERF") || getenv("HYPRISM_GPU_PROFILE")))
         return (void *)w_GL_SwapWindow;
+    if (strcmp(symbol, "SDL_GetDisplayContentScale") == 0 && getenv("HYPRISM_CONTENT_SCALE"))
+        return (void *)w_GetDisplayContentScale;
     if (g_scale == 1.0f)
         return NULL;
     for (size_t i = 0; i < SHIM_COUNT(k_wrappers); i++)

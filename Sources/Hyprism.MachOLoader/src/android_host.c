@@ -74,11 +74,18 @@ int SDL_main(int argc, char *argv[])
         fprintf(stderr, "[host] no external storage path\n");
         return 1;
     }
-    static char exe[PATH_MAX], user[PATH_MAX], extra_path[PATH_MAX];
-    snprintf(exe, sizeof exe, "%s/Client/Hytale.app/Contents/MacOS/HytaleClient", files);
+    // The launcher instance to run (HytaleActivity sets it from the launcher's intent); the default
+    // instance is the files folder itself. Worlds and settings stay in <files>/UserData for every
+    // instance, so they survive reinstalling or switching the game build.
+    const char *game = getenv("HYPRISM_GAME_DIR");
+    if (!game || !*game)
+        game = files;
+    static char exe[PATH_MAX], user[PATH_MAX], extra_path[PATH_MAX], app_dir[PATH_MAX];
+    snprintf(app_dir, sizeof app_dir, "%s", game);
+    snprintf(exe, sizeof exe, "%s/Client/Hytale.app/Contents/MacOS/HytaleClient", game);
     snprintf(user, sizeof user, "%s/UserData", files);
     snprintf(extra_path, sizeof extra_path, "%s/args.txt", files);
-    chdir(files);
+    chdir(game);
     char env_path[PATH_MAX];
     snprintf(env_path, sizeof env_path, "%s/env.txt", files);
     FILE *env = fopen(env_path, "r");
@@ -119,14 +126,31 @@ int SDL_main(int argc, char *argv[])
     setenv("MG_DIR_PATH", mg_dir, 0);
     char mg_config[PATH_MAX];
     snprintf(mg_config, sizeof mg_config, "%s/config.json", mg_dir);
-    if (access(mg_config, F_OK) != 0) {
-        // Hytale requires an OpenGL 4.1 core context; cache translated shaders.
+    // Hytale requires an OpenGL 4.1 core context; cache translated shaders; enableNoError 2 makes
+    // MobileGlues skip its glGetError checks after every forwarded call (CPU time per draw). The
+    // file is rewritten while it is one of the loader's own versions, and left alone once edited.
+    static const char mg_defaults[] =
+        "{\n  \"customGLVersion\": 41,\n  \"maxGlslCacheSize\": 128,\n  \"enableNoError\": 2\n}\n";
+    static const char mg_previous[] = "{\n  \"customGLVersion\": 41,\n  \"maxGlslCacheSize\": 128\n}\n";
+    char current[256] = { 0 };
+    FILE *existing = fopen(mg_config, "r");
+    if (existing) {
+        fread(current, 1, sizeof current - 1, existing);
+        fclose(existing);
+    }
+    if (!existing || strcmp(current, mg_previous) == 0) {
         FILE *config = fopen(mg_config, "w");
         if (config) {
-            fputs("{\n  \"customGLVersion\": 41,\n  \"maxGlslCacheSize\": 128\n}\n", config);
+            fputs(mg_defaults, config);
             fclose(config);
         }
     }
+    // The client's .NET GC: compact harder before growing the heap (ConserveMemory) and a 16 MB
+    // allocation budget between young collections instead of one sized for a desktop CPU cache.
+    // Measured on the S23 walking in a world: ~130 MB less (RAM + swap), no added jank. env.txt
+    // entries win over these.
+    setenv("DOTNET_GCConserveMemory", "7", 0);
+    setenv("DOTNET_GCgen0size", "0x1000000", 0);
     setenv("SDL_OPENGL_LIBRARY", "libmobileglues.so", 0);
     setenv("SDL_EGL_LIBRARY", "libmobileglues.so", 0);
     setenv("HOME", files, 1);
@@ -137,7 +161,7 @@ int SDL_main(int argc, char *argv[])
     args[n++] = "hyprism-macho";
     args[n++] = exe;
     args[n++] = "--app-dir";
-    args[n++] = (char *)files;
+    args[n++] = app_dir;
     args[n++] = "--user-dir";
     args[n++] = user;
 

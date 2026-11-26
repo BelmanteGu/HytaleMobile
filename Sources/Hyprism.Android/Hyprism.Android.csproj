@@ -12,13 +12,15 @@ SPDX-License-Identifier: GPL-3.0-only
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0-android</TargetFramework>
-    <SupportedOSPlatformVersion>24</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion>28</SupportedOSPlatformVersion>
     <AssemblyName>Hyprism.Desktop</AssemblyName>
     <RootNamespace>Hyprism.Desktop</RootNamespace>
-    <ApplicationId>org.hyprism.launcher</ApplicationId>
-    <ApplicationTitle>Hyprism</ApplicationTitle>
-    <ApplicationVersion>1</ApplicationVersion>
-    <ApplicationDisplayVersion>4.0.0</ApplicationDisplayVersion>
+    <!-- One app for the launcher and the game: the game runs in its own process (:game) and keeps the
+         package name the game host had, so its files and worlds carry over -->
+    <ApplicationId>org.hyprism.game</ApplicationId>
+    <ApplicationTitle>Hytale</ApplicationTitle>
+    <ApplicationVersion>100</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0.0</ApplicationDisplayVersion>
     <Version>4.0.0</Version>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
     <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
@@ -32,7 +34,31 @@ SPDX-License-Identifier: GPL-3.0-only
     <Nullable>enable</Nullable>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <DesktopSources>../Hyprism.Desktop/</DesktopSources>
+    <!-- The game half, from Hyprism.MachOLoader/android/build-bundle.sh -->
+    <GameBundle>../Hyprism.MachOLoader/out/bundle/</GameBundle>
+    <!-- Signed like the game host APK was, so this installs over it and keeps the game files -->
+    <AndroidKeyStore>true</AndroidKeyStore>
+    <AndroidSigningKeyStore>$(HOME)/.android/debug.keystore</AndroidSigningKeyStore>
+    <AndroidSigningKeyAlias>androiddebugkey</AndroidSigningKeyAlias>
+    <AndroidSigningKeyPass>android</AndroidSigningKeyPass>
+    <AndroidSigningStorePass>android</AndroidSigningStorePass>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The SDK picks up **/*.java for binding; this one is compiled with the generated Java wrappers --><AndroidJavaSource Update="Java/**/*.java" Bind="false" />
+    <AndroidJavaLibrary Include="$(GameBundle)classes.jar" />
+    <AndroidNativeLibrary Include="$(GameBundle)lib/arm64-v8a/*.so" Abi="arm64-v8a" />
+    <AndroidAsset Include="$(GameBundle)assets/**" Link="Assets/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+  <!-- The SDK starts .NET in every process the manifest names, through a MonoRuntimeProvider_N; the
+       game's process must stay free of it (see Java/org/hyprism/game/HyprismApplication.java). -->
+  <Target Name="KeepDotnetOutOfGameProcess" AfterTargets="_ManifestMerger">
+    <Exec Command="perl -ni -e 'print unless /mono\.MonoRuntimeProvider_/' &quot;$(IntermediateOutputPath)android/AndroidManifest.xml&quot;" />
+  </Target>
+  <Target Name="CheckGameBundle" BeforeTargets="Build">
+    <Error Condition="!Exists('$(GameBundle)classes.jar')"
+           Text="Missing the game bundle: run Sources/Hyprism.MachOLoader/android/build-bundle.sh first." />
+  </Target>
 
   <ItemGroup>
     <Compile Include="$(DesktopSources)**/*.cs"

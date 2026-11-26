@@ -60,6 +60,12 @@ public sealed partial class InstanceListView : UserControl
     private void OnOpenInstanceFolderMenuClicked(object? sender, RoutedEventArgs args)
         => SelectInstanceForMenuAction(sender, args)?.OpenManagedInstanceFolderCommand.Execute(null);
 
+    private void OnPregenerateWorldMenuClicked(object? sender, RoutedEventArgs args)
+    {
+        SelectInstanceForMenuAction(sender, args);
+        Hyprism.Desktop.Platform.PlatformActions.PregenerateWorld?.Invoke();
+    }
+
     private void OnEditInstanceMenuClicked(object? sender, RoutedEventArgs args)
         => SelectInstanceForMenuAction(sender, args)?.BeginEditManagedInstanceCommand.Execute(null);
 
